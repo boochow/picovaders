@@ -2,6 +2,14 @@
 
 Arduboy arduboy;
 
+#define DRAW_PIXEL(x,y,c) arduboy.drawPixel((x), (y), (c));
+#define GET_PIXEL(x,y) arduboy.getPixel((x), (y))
+#define DRAW_BITMAP(x,y,b,w,h,c) arduboy.drawBitmap((x), (y), (b), (w), (h), (c))
+#define DRAW_RECT(x,y,w,h,c) arduboy.drawRect((x), (y), (w), (h), (c))
+#define FILL_RECT(x,y,w,h,c) arduboy.fillRect((x), (y), (w), (h), (c))
+#define DRAW_H_LINE(x,y,l,c) arduboy.drawFastHLine((x),(y),(l),(c))
+#define DRAW_V_LINE(x,y,l,c) arduboy.drawFastVLine((x),(y),(l),(c))
+
 #define MAXINT16 65535
 
 boolean sound_on = true;
@@ -27,23 +35,28 @@ void draw7seg(int16_t x, int16_t y, uint8_t n) {
   };
   n = n % 10;
   uint8_t img = digit[n];
-  arduboy.drawFastHLine(x, y, 2, img & 1);
-  arduboy.drawFastVLine(x+2, y, 3, (img = img >> 1) & 1);
-  arduboy.drawFastVLine(x+2, y+3, 3, (img = img >> 1) & 1);
-  arduboy.drawFastHLine(x, y+5, 2, (img = img >> 1) & 1);
-  arduboy.drawFastVLine(x, y+3, 2, (img = img >> 1) & 1);
-  arduboy.drawPixel(x + 1, y + 2, (img = img >> 1) & 1);
-  arduboy.drawFastVLine(x, y+1, 2, (img = img >> 1) & 1);
+  DRAW_H_LINE(x, y, 2, img & 1);
+  DRAW_V_LINE(x+2, y, 3, (img = img >> 1) & 1);
+  DRAW_V_LINE(x+2, y+3, 3, (img = img >> 1) & 1);
+  DRAW_H_LINE(x, y+5, 2, (img = img >> 1) & 1);
+  DRAW_V_LINE(x, y+3, 2, (img = img >> 1) & 1);
+  DRAW_PIXEL(x + 1, y + 2, (img = img >> 1) & 1);
+  DRAW_V_LINE(x, y+1, 2, (img = img >> 1) & 1);
 }
 
 #define OBJ_READY -1
 #define OBJ_ACTIVE 0
 #define OBJ_RECYCLE 1
 
+
+/////////////////////////////////////////////////////////
+//  Invaders
+/////////////////////////////////////////////////////////
+
 #define IV_ROW 5
 #define IV_COLUMN 10
 #define IV_NUM (IV_ROW * IV_COLUMN)
-#define IV_TOP 6
+#define IV_TOP 7
 #define IV_W 5
 #define IV_H 3
 #define IV_HSPACING 2
@@ -89,31 +102,33 @@ struct aliens_t {
   int16_t cur_top;
   int16_t nxt_left;
   int16_t nxt_top;
-  int16_t bottom;
+  int16_t bottom;   // be updated in aliens_draw
   int16_t v;      // left move or right move
-  uint8_t nxt_update; // which invader will be moved at next tick
+  uint8_t nxt_update; // which invader will be moved at the next tick
   uint8_t pose;   // index num for iv?_img[]
-  boolean move_down;  // down-move flag
+  boolean move_down;  // down-move flag (updated in aliens_draw)
   boolean touch_down; // an alien touched bottom line flag
-  uint8_t show_hit; // show hit image while >0
+  int8_t status;
   uint8_t hit_idx;  // which invader is been hit
   uint8_t alive;    // how many aliens alive
 } aliens;
 
-void aliens_init(struct aliens_t *a) {
+void aliens_init(struct aliens_t *a, uint8_t stg) {
+  const int8_t top[9] = {0, 2, 4, 5, 5, 5, 6, 6, 6};
+  int16_t y = IV_TOP + top[stg % 9] * IV_H;
   for (uint8_t i = 0; i < IV_NUM; i++)
     a->exist[i] = true;
   a->cur_left = SCRN_LEFT + 9;
   a->v = 1;
   a->nxt_left = a->cur_left + a->v;
-  a->cur_top = IV_TOP;
-  a->nxt_top = IV_TOP;
-  a->bottom = 0; // will be updated in aliens_draw
+  a->cur_top = y;
+  a->nxt_top = y;
+  a->bottom = 0;
   a->nxt_update = 0;
   a->pose = 0;
   a->move_down = false;
   a->touch_down = false;
-  a->show_hit = 0;
+  a->status = 0;
   a->hit_idx = 0;
   a->alive = IV_NUM;
 }
@@ -129,7 +144,7 @@ void aliens_erase(struct aliens_t *a) {
   uint8_t col = A_COL(a->nxt_update);
   int16_t x = a->cur_left + A_XOFS(col);
   int16_t y = a->cur_top + A_YOFS(row);
-  arduboy.fillRect(x, y, IV_W, IV_H, BLACK);
+  FILL_RECT(x, y, IV_W, IV_H, BLACK);
 }
 
 void aliens_draw(struct aliens_t *a) {
@@ -149,7 +164,7 @@ void aliens_draw(struct aliens_t *a) {
   case 3:
   case 4: img = (uint8_t *)iv3_img[a->pose]; break;
   }
-  arduboy.drawBitmap(x, y, img, IV_W, IV_H, WHITE);
+  DRAW_BITMAP(x, y, img, IV_W, IV_H, WHITE);
 
   if (((x <= SCRN_LEFT) && (a->v < 0)) ||
     ((x >= SCRN_RIGHT - IV_W) && (a->v > 0)))
@@ -174,7 +189,7 @@ void aliens_hitimg_erase_alien(struct aliens_t *a) {
   }
   x += A_XOFS(col);
   y += A_YOFS(row);;
-  arduboy.fillRect(x, y, IV_W, IV_H, BLACK);
+  FILL_RECT(x, y, IV_W, IV_H, BLACK);
 }
 
 void aliens_hitimg_erase(struct aliens_t *a) {
@@ -183,7 +198,7 @@ void aliens_hitimg_erase(struct aliens_t *a) {
 
   int16_t x = a->nxt_left + A_XOFS(col);
   int16_t y = a->nxt_top + A_YOFS(row);
-  arduboy.fillRect(x, y, IV_W, IV_H, BLACK);
+  FILL_RECT(x, y, IV_W, IV_H, BLACK);
 }
 
 void aliens_hitimg_draw(struct aliens_t *a) {
@@ -191,7 +206,7 @@ void aliens_hitimg_draw(struct aliens_t *a) {
   uint8_t col = A_COL(a->hit_idx);
   int16_t x = a->nxt_left + A_XOFS(col);
   int16_t y = a->nxt_top + A_YOFS(row);
-  arduboy.drawBitmap(x, y, iv_hit_img, IV_W, IV_H, WHITE);
+  DRAW_BITMAP(x, y, iv_hit_img, IV_W, IV_H, WHITE);
 }
 
 void aliens_move(struct aliens_t *a) {
@@ -224,11 +239,11 @@ void aliens_move(struct aliens_t *a) {
 void aliens_hit(struct aliens_t *a, uint16_t idx) {
   a->exist[idx] = false;
   a->hit_idx = idx;
-  a->show_hit = IV_SHOW_HIT;
+  a->status = IV_SHOW_HIT;
   a->alive--;
 }
 
-int8_t aliens_hit_test(struct aliens_t *a, uint16_t x, uint16_t y) {
+int8_t aliens_hit_test(struct aliens_t *a, int16_t x, int16_t y) { // returns alien index
   int16_t lmin = min(a->cur_left, a->nxt_left);
   int16_t tmin = min(a->cur_top, a->nxt_top);
 
@@ -254,8 +269,147 @@ int8_t aliens_hit_test(struct aliens_t *a, uint16_t x, uint16_t y) {
       }
     }
   }
-  return -1;
+  return -1; // no aliens hits
 }
+
+void aliens_update(struct aliens_t *a) {
+  switch (a->status) {
+  case OBJ_ACTIVE:
+    aliens_erase(&aliens);
+    aliens_draw(&aliens);
+    aliens_move(&aliens);
+    break;
+  case IV_SHOW_HIT:
+    aliens_hitimg_erase_alien(a);
+    aliens_hitimg_draw(a);
+    a->status--;
+    break;
+  case OBJ_RECYCLE:
+    aliens_hitimg_erase(&aliens);
+    a->status = OBJ_ACTIVE;
+    break;
+  default:
+    a->status--;
+
+  }
+}
+
+/////////////////////////////////////////////////////////
+//  UFO
+/////////////////////////////////////////////////////////
+
+#define UFO_TOP 0
+#define UFO_BOTTOM 3
+#define UFO_W 7
+#define UFO_H 3
+#define UFO_INTERVAL 1500 // 60 ticks * 25 sec
+#define UFO_WAIT 3
+#define UFO_SHOW_HIT 120
+
+const uint8_t ufo_img[UFO_W] PROGMEM =
+{ 0x06, 0x05, 0x07, 0x03, 0x07, 0x05, 0x06 };
+
+const uint8_t ufo_score_img[4][UFO_W] PROGMEM = {
+  { 0x00, 0x05, 0x03, 0x00, 0x06, 0x06, 0x00 },
+  { 0x07, 0x00, 0x06, 0x06, 0x00, 0x06, 0x06 },
+  { 0x07, 0x00, 0x05, 0x03, 0x00, 0x06, 0x06 },
+  { 0x05, 0x07, 0x00, 0x06, 0x06, 0x06, 0x06 }
+};
+
+struct ufo_t {
+  uint16_t wait_ctr;
+  uint16_t x;
+  int8_t v;
+  int8_t l_or_r;
+  int8_t status;
+  uint8_t img_idx;  // index for ufo_score_img
+} ufo;
+
+void ufo_init(struct ufo_t *u) {
+  u->wait_ctr = 0;
+  u->status = OBJ_READY;
+}
+
+void ufo_appear(struct ufo_t *u) {
+
+  if ((aliens.alive > 7) && (u->wait_ctr++ > UFO_INTERVAL)) {
+
+    u->status = OBJ_ACTIVE;
+    u->wait_ctr = 0;
+
+    switch (u->l_or_r) {
+    case 0:
+      u->v = 1;
+      u->x = SCRN_LEFT;
+      break;
+    default:
+      u->v = -1;
+      u->x = SCRN_RIGHT - UFO_W;
+    }
+  }
+}
+
+void ufo_draw(struct ufo_t *u) {
+  DRAW_BITMAP(u->x, UFO_TOP, ufo_img, UFO_W, UFO_H, WHITE);
+}
+
+void ufo_erase(struct ufo_t *u) {
+  FILL_RECT(u->x, UFO_TOP, UFO_W, UFO_H, BLACK);
+}
+
+void ufo_move(struct ufo_t *u) {
+  u->x += u->v;
+  if ((u->x <= SCRN_LEFT) || (u->x >= SCRN_RIGHT - UFO_W))
+    u->status = OBJ_RECYCLE;
+}
+
+void ufo_hit(struct ufo_t *u, uint8_t idx) {
+  ufo_init(u);
+  u->status = UFO_SHOW_HIT;
+  ufo_erase(u);
+  u->img_idx = idx;
+}
+
+int16_t ufo_hit_test(struct ufo_t *u, uint16_t x, uint16_t y) {
+  if ((u->status == OBJ_ACTIVE) && 
+    (y < UFO_BOTTOM) && 
+    (x >= u->x) && (x < u->x + UFO_W)) {
+
+    ufo_init(u);
+    u->status = UFO_SHOW_HIT;
+    ufo_erase(u);
+  }
+  else
+    return -1;
+}
+
+void ufo_update(struct ufo_t *u) {
+  switch (u->status) {
+  case OBJ_ACTIVE:
+    if (u->wait_ctr++ > UFO_WAIT) {
+      u->wait_ctr = 0;
+      ufo_erase(u);
+      ufo_move(u);
+      ufo_draw(u);
+    }
+    break;
+  case OBJ_READY:
+    ufo_appear(u);
+    break;
+  case OBJ_RECYCLE:
+    ufo_erase(u);
+    u->status = OBJ_READY;
+    break;
+  case UFO_SHOW_HIT:
+    DRAW_BITMAP(u->x, UFO_TOP, ufo_score_img[u->img_idx], UFO_W, UFO_H, WHITE);
+  default:
+    u->status--;
+  }
+}
+
+/////////////////////////////////////////////////////////
+//  Bunkers
+/////////////////////////////////////////////////////////
 
 #define BUNKER_TOP 52
 #define BUNKER_BOTTOM (BUNKER_TOP + BUNKER_H)
@@ -272,14 +426,18 @@ void draw_bunkers() {
   uint16_t x = BUNKER_LEFT + SCRN_LEFT;
 
   for (uint8_t i = 0; i < BUNKER_NUM; i++) {
-    arduboy.drawBitmap(x, BUNKER_TOP, bunker_img, BUNKER_W, BUNKER_H, WHITE);
+    DRAW_BITMAP(x, BUNKER_TOP, bunker_img, BUNKER_W, BUNKER_H, WHITE);
     x += BUNKER_W + BUNKER_SPACE;
   }
 }
 
+/////////////////////////////////////////////////////////
+//  Bombs
+/////////////////////////////////////////////////////////
+
 #define BOMB_NUM 3
-#define BOMB_WAIT 2
-#define BOMB_V 1
+#define BOMB_WAIT 3
+#define BOMB_V 2
 #define BOMB_SHOW_HIT 18
 
 struct bomb_t {
@@ -298,33 +456,33 @@ void bomb_draw(struct bomb_t *b, uint8_t color) {
 void bomb_draw_a(struct bomb_t *b, uint8_t color) {
   if (b->status != OBJ_ACTIVE)
     return;
-  arduboy.drawPixel(b->x + ((1+ b->y) % 2), b->y - 3, color);
-  arduboy.drawPixel(b->x + (b->y % 2), b->y - 2, color);
-  arduboy.drawPixel(b->x + ((1+ b->y) % 2), b->y - 1, color);
-  arduboy.drawPixel(b->x + (b->y % 2), b->y, color);
+  DRAW_PIXEL(b->x + ((1+ b->y) % 2), b->y - 3, color);
+  DRAW_PIXEL(b->x + (b->y/BOMB_V % 2), b->y - 2, color);
+  DRAW_PIXEL(b->x + ((1+ b->y) % 2), b->y - 1, color);
+  DRAW_PIXEL(b->x + (b->y/BOMB_V % 2), b->y, color);
 }
 
 void bomb_draw_b(struct bomb_t *b, uint8_t color) {
   if (b->status != OBJ_ACTIVE)
     return;
-  arduboy.drawPixel(b->x + 1, b->y - 1 - (b->y % 2), color);
-  arduboy.drawPixel(b->x, b->y - 1 - (b->y % 2), color);
-  arduboy.drawPixel(b->x + 1, b->y, color);
-  arduboy.drawPixel(b->x, b->y, color);
+  DRAW_PIXEL(b->x + 1, b->y - 1 - (b->y / BOMB_V % 2), color);
+  DRAW_PIXEL(b->x, b->y - 1 - (b->y / BOMB_V % 2), color);
+  DRAW_PIXEL(b->x + 1, b->y, color);
+  DRAW_PIXEL(b->x, b->y, color);
 }
 
 void bomb_draw_c(struct bomb_t *b, uint8_t color) {
   if (b->status != OBJ_ACTIVE)
     return;
-  arduboy.drawPixel(b->x + ((1 + b->y) % 2), b->y - 2, color);
-  arduboy.drawPixel(b->x + 1, b->y - 1, color);
-  arduboy.drawPixel(b->x, b->y - 1, color);
-  arduboy.drawPixel(b->x + (b->y % 2), b->y, color);
+  DRAW_PIXEL(b->x + ((1 + b->y) / BOMB_V % 2), b->y - 2, color);
+  DRAW_PIXEL(b->x + 1, b->y - 1, color);
+  DRAW_PIXEL(b->x, b->y - 1, color);
+  DRAW_PIXEL(b->x + (b->y / BOMB_V % 2), b->y, color);
 }
 
 int8_t search_alien(struct aliens_t *a, int8_t x) {
   int8_t a_idx = -1;
-  uint8_t y = a->bottom - IV_H;
+  int8_t y = a->bottom - IV_H;
 
   for (uint8_t i = 0; i < IV_ROW; i++) {
     a_idx = aliens_hit_test(a, x + 2, y);
@@ -341,11 +499,12 @@ void bomb_shot_from(struct bomb_t *b, uint8_t a_idx) {
     a_idx -= IV_COLUMN;
   b->status = OBJ_ACTIVE;
   b->x = aliens.nxt_left + A_XOFS(A_COL(a_idx)) + IV_W / 2;
-  b->y = aliens.nxt_top + A_YOFS(A_ROW(a_idx)) + IV_H * 2 + IV_VSPACING;
+  b->y = aliens.nxt_top + A_YOFS(A_ROW(a_idx)) + (IV_H + IV_VSPACING) * 2;
 }
 
 void bomb_shot_a(struct bomb_t *b) {
-  bomb_shot_from(b, aliens.nxt_update);
+  if (ufo.status == OBJ_READY)
+    bomb_shot_from(b, aliens.nxt_update);
 }
 
 void bomb_shot_c(struct bomb_t *b) {
@@ -364,18 +523,18 @@ void bomb_init(struct bomb_t *b) {
 }
 
 void bomb_hitimg_draw(struct bomb_t *b, uint8_t color) {
-  arduboy.drawPixel(b->x, b->y, color);
-  arduboy.drawPixel(b->x+1, b->y, color);
-  arduboy.drawPixel(b->x, b->y+1, color);
-  arduboy.drawPixel(b->x+1, b->y+1, color);
+  DRAW_PIXEL(b->x, b->y, color);
+  DRAW_PIXEL(b->x+1, b->y, color);
+  DRAW_PIXEL(b->x, b->y-1, color);
+  DRAW_PIXEL(b->x+1, b->y-1, color);
 }
 
 boolean bomb_bunker_test(struct bomb_t *b) {
   if ((b->y < BUNKER_BOTTOM) && (b->y > BUNKER_TOP)) {
-    if (arduboy.getPixel(b->x + ((1 + b->y) % 2), b->y - 3) ||
-      arduboy.getPixel(b->x + (b->y % 2), b->y - 2) ||
-      arduboy.getPixel(b->x + ((1 + b->y) % 2), b->y - 1) ||
-      arduboy.getPixel(b->x + (b->y % 2), b->y)) {
+    if (GET_PIXEL(b->x, b->y) ||
+      GET_PIXEL(b->x + 1, b->y ) ||
+      GET_PIXEL(b->x, b->y - 1) ||
+      GET_PIXEL(b->x + 1, b->y - 1)) {
       return true;
     }
   }
@@ -408,64 +567,38 @@ void bomb_shot(struct bomb_t *b) {
     wait_ctr--;
 }
 
+/////////////////////////////////////////////////////////
+//  Laser
+/////////////////////////////////////////////////////////
+
 #define LASER_V 2
 #define LASER_WAIT 0
-#define LASER_OFS 2
-#define LASER_CNTR_INIT 7
+#define LASER_CNTR_INIT 14
 #define LASER_CNTR_MOD 15
 
-#define CANNON_V 1
-#define CANNON_WAIT 2
-#define CANNON_TOP 61
-#define CANNON_SHOW_HIT 195
-
-const uint8_t cannon_img[IV_W] PROGMEM =
-{ 0x06, 0x06, 0x07, 0x06, 0x06 };
-
-const uint8_t cannon_hit_img[2][IV_W] PROGMEM = {
-  { 0x01, 0x05, 0x06, 0x06, 0x05 },
-  { 0x04, 0x07, 0x04, 0x05, 0x02 }
-};
+const uint8_t laser_misshot_img[3] PROGMEM = { 0x05, 0x02, 0x05 };
 
 struct laser_t {
   int16_t x;
   int16_t y;
   int8_t wait_ctr;
-  boolean exists;
   uint8_t shot_ctr; // for calculating ufo score
-  uint8_t show_misshot; // wait until charge!
+  int8_t status;
 };
 
 void laser_init(struct laser_t *l) {
-  l->exists = false;
+  l->status = OBJ_READY;
   l->shot_ctr = LASER_CNTR_INIT;
   l->wait_ctr = 0;
 }
 
-struct cannon_t {
-  uint16_t x;
-  uint8_t left;
-  struct laser_t laser;
-  uint8_t wait_ctr;
-  uint8_t show_hit;
-} cannon;
-
-void cannon_init(struct cannon_t *c) {
-  c->x = 32;
-  c->wait_ctr = 0;
-  laser_init(&c->laser);
-  c->show_hit = 0;
-}
-
-const uint8_t laser_misshot_img[3] PROGMEM = { 0x05, 0x02, 0x05 };
-
 void laser_draw_misshot(struct laser_t *l, uint8_t color) {
-  arduboy.drawBitmap(l->x - 1, l->y, laser_misshot_img, 3, 3, color);
+  DRAW_BITMAP(l->x - 1, l->y, laser_misshot_img, 3, 3, color);
 }
 
 boolean laser_bunker_test(struct laser_t *l) {
   if ((l->y < BUNKER_BOTTOM) && (l->y > BUNKER_TOP) && (l->y > aliens.bottom)) {
-    if (arduboy.getPixel(l->x, l->y) || (arduboy.getPixel(l->x, l->y + 1))) {
+    if (GET_PIXEL(l->x, l->y) || (GET_PIXEL(l->x, l->y + 1))) {
       return true;
     }
   }
@@ -477,47 +610,154 @@ void laser_move(struct laser_t *l) {
     return;
 
   l->wait_ctr = 0;
-  if (l->exists) {
+  if (l->status == OBJ_ACTIVE) {
     l->y -= LASER_V;
     if (l->y <= 0) {
-      l->exists = false;
-      l->show_misshot = IV_SHOW_HIT;
+      l->status = IV_SHOW_HIT;
     }
     else {
       if (laser_bunker_test(l)) {
-        l->exists = false;
-        l->show_misshot = IV_SHOW_HIT;
+        l->status = IV_SHOW_HIT;
       }
     }
   }
 }
 
 void laser_draw(struct laser_t *l, uint8_t color) {
-  arduboy.drawPixel(l->x, l->y, color);
-  arduboy.drawPixel(l->x, l->y + 1, color);
+  DRAW_PIXEL(l->x, l->y, color);
+  DRAW_PIXEL(l->x, l->y + 1, color);
 }
 
 void laser_draw_mishit(struct laser_t *l, uint8_t color) {
-  arduboy.drawBitmap(l->x-1, l->y, laser_misshot_img, 3, 3, color);
+  DRAW_BITMAP(l->x - 1, l->y, laser_misshot_img, 3, 3, color);
 }
 
-void laser_shoot(struct laser_t *l, uint16_t x) {
-  if ((!l->exists) && (l->show_misshot == 0) && (aliens.show_hit == 0)) {
+void laser_shoot(struct laser_t *l, uint16_t x, uint16_t y) {
+  if ((l->status == OBJ_READY) && (aliens.status == OBJ_ACTIVE)) {
     if (arduboy.pressed(A_BUTTON) || arduboy.pressed(B_BUTTON)) {
-      l->exists = true;
-      l->x = x + LASER_OFS;
-      l->y = CANNON_TOP - 1;
+      l->status = OBJ_ACTIVE;
+      l->x = x;
+      l->y = y;
       l->shot_ctr = (l->shot_ctr + 1) % LASER_CNTR_MOD;
+      ufo.l_or_r = l->shot_ctr & 0x1;
     }
   }
 }
 
+uint8_t laser_ufo_point(struct laser_t *l) {
+  uint8_t idx;
+
+  switch (l->shot_ctr) {
+  case 0:
+  case 1:
+  case 6:
+  case 11:
+    idx = 0;
+    break;
+
+  case 3:
+  case 12:
+    idx = 2;
+    break;
+
+  case 7:
+    idx = 3;
+    break;
+
+  default:
+    idx = 1;
+    break;
+  }
+  return idx;
+}
+
+uint8_t laser_update(struct laser_t *l) { // returns point if laser hits
+  const uint8_t alien_points[5] = { 3, 2, 2, 1, 1 };
+  const uint8_t ufo_points[4] = { 5, 10, 15, 30 };
+  int8_t hit;
+  uint8_t result = 0;
+
+  switch (l->status) {
+  case OBJ_READY:
+    break;
+  case OBJ_ACTIVE:
+    laser_draw(l, BLACK);
+    laser_move(l);
+    laser_draw(l, WHITE);
+
+    hit = aliens_hit_test(&aliens, l->x, l->y);
+    if (hit >= 0) {
+      aliens_hit(&aliens, hit);
+      laser_draw(l, BLACK);
+      result = alien_points[A_ROW(hit)];
+      l->status = OBJ_READY;
+    }
+
+    if (ufo_hit_test(&ufo, l->x, l->y) >= 0) {
+      laser_draw(l, BLACK);
+      uint8_t idx = laser_ufo_point(l);
+      ufo_hit(&ufo, idx);
+      result = ufo_points[idx];
+      l->status = OBJ_READY;
+    }
+    break;
+  case IV_SHOW_HIT:
+    laser_draw(l, BLACK);
+    laser_draw_misshot(l, WHITE);
+    l->status--;
+    break;
+  case OBJ_RECYCLE:
+    laser_draw_misshot(l, BLACK);
+    l->status = OBJ_READY;
+    break;
+  default:
+    l->status--;
+  }
+
+  return result;
+}
+
+/////////////////////////////////////////////////////////
+//  Cannon
+/////////////////////////////////////////////////////////
+
+#define CANNON_W 5
+#define CANNON_H 3
+#define CANNON_V 1
+#define CANNON_C_OFS 2
+#define CANNON_WAIT 0
+#define CANNON_TOP 61
+#define CANNON_SHOW_HIT 195
+
+const uint8_t cannon_img[CANNON_W] PROGMEM =
+{ 0x06, 0x06, 0x07, 0x06, 0x06 };
+
+const uint8_t cannon_hit_img[2][CANNON_W] PROGMEM = {
+  { 0x01, 0x05, 0x06, 0x06, 0x05 },
+  { 0x04, 0x07, 0x04, 0x05, 0x02 }
+};
+
+struct cannon_t {
+  uint16_t x;
+  uint8_t left;
+  struct laser_t laser;
+  uint8_t wait_ctr;
+  int8_t status;
+} cannon;
+
+void cannon_init(struct cannon_t *c) {
+  c->x = 32;
+  c->wait_ctr = 0;
+  laser_init(&c->laser);
+  c->status = OBJ_ACTIVE;
+}
+
 void cannon_erase(struct cannon_t *c) {
-  arduboy.fillRect(c->x, CANNON_TOP, IV_W, IV_H, BLACK);
+  FILL_RECT(c->x, CANNON_TOP, CANNON_W, CANNON_H, BLACK);
 }
 
 void cannon_draw(struct cannon_t *c) {
-  arduboy.drawBitmap(c->x, CANNON_TOP, cannon_img, IV_W, IV_H, WHITE);
+  DRAW_BITMAP(c->x, CANNON_TOP, cannon_img, CANNON_W, CANNON_H, WHITE);
 }
 
 void cannon_move(struct cannon_t *c) {
@@ -527,28 +767,44 @@ void cannon_move(struct cannon_t *c) {
   if (arduboy.pressed(LEFT_BUTTON)) {
     c->x -= CANNON_V;
   }
-  c->x = constrain(c->x, SCRN_LEFT, SCRN_RIGHT - IV_W);
+  c->x = constrain(c->x, SCRN_LEFT, SCRN_RIGHT - CANNON_W);
 }
 
 void cannon_hit(struct cannon_t *c) {
-  c->show_hit = CANNON_SHOW_HIT;
+  c->status = CANNON_SHOW_HIT;
+  c->laser.status = OBJ_RECYCLE;
 }
 
 boolean cannon_hit_test(struct cannon_t *c, uint16_t x, uint16_t y) {
-  if ((y > CANNON_TOP) && (y < CANNON_TOP + IV_H) && (x >= c->x) && (x <= c->x + IV_W)) {
+  if ((y > CANNON_TOP) && (y < CANNON_TOP + CANNON_H) && (x >= c->x) && (x <= c->x + CANNON_W)) {
     return true;
   }
   else
     return false;
 }
 
-boolean cannon_process(struct cannon_t *c) {
-  if (c->wait_ctr++ < CANNON_WAIT) {
-    return false;
-  }
-  else {
-    c->wait_ctr = 0;
-    return true;
+void cannon_update(struct cannon_t *c) {
+
+  switch (c->status) {
+  case OBJ_ACTIVE:
+    if (c->wait_ctr++ > CANNON_WAIT) {
+      c->wait_ctr = 0;
+      cannon_erase(c);
+      cannon_move(c);
+      laser_shoot(&c->laser, c->x + CANNON_C_OFS, CANNON_TOP - 1);
+      cannon_draw(c);
+    }
+    break;
+  case OBJ_RECYCLE:
+    laser_draw(&c->laser, BLACK);
+    c->status = OBJ_READY;
+    break;
+  default:
+    cannon_erase(c);
+    uint8_t *img = (uint8_t *)cannon_hit_img[(c->status >> 2) % 2];
+    DRAW_BITMAP(c->x, CANNON_TOP, img, CANNON_W, CANNON_H, WHITE);
+    c->status--;
+    break;
   }
 }
 
@@ -558,7 +814,7 @@ void bomb_shot_b(struct bomb_t *b) {
     bomb_shot_from(b, a_idx);
 }
 
-void process_bomb(struct bomb_t *b) {
+void bomb_update(struct bomb_t *b) {
   switch (b->status) {
   case OBJ_READY:
     bomb_shot(b);
@@ -585,146 +841,46 @@ void process_bomb(struct bomb_t *b) {
   }
 }
 
+/////////////////////////////////////////////////////////
+//  Game
+/////////////////////////////////////////////////////////
 
-#define UFO_TOP 0
-#define UFO_BOTTOM 3
-#define UFO_W 7
-#define UFO_H 3
-#define UFO_INTERVAL 25
-#define UFO_WAIT 3
-#define UFO_SHOW_HIT 120
-
-const uint8_t ufo_img[UFO_W] PROGMEM =
-{ 0x06, 0x05, 0x07, 0x03, 0x07, 0x05, 0x06 };
-
-const uint8_t ufo_score_img[4][UFO_W] PROGMEM = {
-  { 0x00, 0x05, 0x03, 0x00, 0x06, 0x06, 0x00 },
-  { 0x07, 0x00, 0x06, 0x06, 0x00, 0x06, 0x06 },
-  { 0x07, 0x00, 0x05, 0x03, 0x00, 0x06, 0x06 },
-  { 0x05, 0x07, 0x00, 0x06, 0x06, 0x06, 0x06 }
+enum game_status_t {
+  GameLost,
+  GameOnGoing,
+  GameRestart,
+  GameOver
 };
 
-struct ufo_t {
-  uint16_t wait_ctr;
-  uint16_t x;
-  int8_t v;
-  boolean exists;
-  uint8_t show_hit; // show hit image while >0
-  uint8_t img_idx;  // index for ufo_score_img
-} ufo;
+struct game_t {
+  int16_t score;
+  uint8_t stage;
+  uint8_t left;
+  game_status_t status;
+}g_game;
 
-void ufo_init(struct ufo_t *u) {
-  u->wait_ctr = 60 * UFO_INTERVAL;
-  u->exists = false;
-  u->show_hit = 0;
-}
-
-void ufo_appear(struct ufo_t *u) {
-  u->exists = true;
-  if (cannon.laser.shot_ctr & 0x1) {
-    u->v = 1;
-    u->x = SCRN_LEFT;
-  }
-  else {
-    u->v = -1;
-    u->x = SCRN_RIGHT - UFO_W;
+void print_int(int16_t x, int16_t y, uint16_t s, uint8_t digit) {
+  x += 4 * (digit - 1);
+  for (; digit > 0; digit--) {
+    draw7seg(x, y, s % 10);
+    x -= 4;
+    s /= 10;
   }
 }
 
-void ufo_countdown(struct ufo_t *u) {
-  if ((aliens.alive > 7) && (u->wait_ctr-- == 0)) {
-    ufo_appear(u);
-  }
+void print_score() {
+  print_int(109, 20, g_game.score, 4);
 }
 
-boolean ufo_process(struct ufo_t *u) {
-  if (u->wait_ctr++ < UFO_WAIT) {
-    return false;
-  }
-  else {
-    u->wait_ctr = 0;
-    return true;
-  }
+void print_cannon_left(uint8_t n) {
+  draw7seg(13, 20, n);
 }
 
-void ufo_draw(struct ufo_t *u) {
-  if (u->exists)
-    arduboy.drawBitmap(u->x, UFO_TOP, ufo_img, UFO_W, UFO_H, WHITE);
+void game_initialize() {
+  g_game.score = 0;
+  g_game.stage = 0;
+  g_game.left = 3;
 }
-
-void ufo_erase(struct ufo_t *u) {
-  arduboy.fillRect(u->x, UFO_TOP, UFO_W, UFO_H, BLACK);
-}
-
-void ufo_move(struct ufo_t *u) {
-  u->x += u->v;
-  if ((u->x < SCRN_LEFT) || (u->x > SCRN_RIGHT - UFO_W))
-    ufo_init(u);
-}
-
-int16_t ufo_hit_test(struct ufo_t *u, uint16_t x, uint16_t y) {
-  if (u->exists && (y < UFO_BOTTOM) && (x >= u->x) && (x < u->x + UFO_W)) {
-    ufo_init(u);
-    u->show_hit = UFO_SHOW_HIT;
-    ufo_erase(u);
-
-    int16_t sc;
-    switch (cannon.laser.shot_ctr) {
-    case 0:
-    case 1:
-    case 6:
-    case 11:
-      u->img_idx = 0;
-      sc = 50;
-      break;
-
-    case 3:
-    case 12:
-      u->img_idx = 2;
-      sc = 150;
-      break;
-
-    case 7: 
-      u->img_idx = 3;
-      sc = 300;
-      break;
-
-    default:
-      u->img_idx = 1;
-      sc = 100;
-      break;
-    }
-  }
-  else
-    return -1;
-}
-
-void process_ufo(struct ufo_t *u) {
-  if (u->exists) {
-    if (ufo_process(u)) {
-      ufo_erase(u);
-      ufo_move(u);
-      ufo_draw(u);
-    }
-  }
-  else if (u->show_hit > 0) {
-    if (u->show_hit == UFO_SHOW_HIT)
-      arduboy.drawBitmap(u->x, UFO_TOP, ufo_score_img[u->img_idx], UFO_W, UFO_H, WHITE);
-    else if (u->show_hit == 1)
-      ufo_erase(u);
-    u->show_hit--;
-  }
-  else {
-    ufo_countdown(u);
-  }
-}
-
-enum GameStatus_t {
-  GAME_LOST,
-  GAME_ONGOING,
-  GAME_RESTART,
-  GAME_OVER
-} gameStatus;
 
 boolean game_new_game()
 {
@@ -756,10 +912,11 @@ boolean game_new_game()
   return result;
 }
 
-boolean game_restart() {
-  arduboy.fillRect(SCRN_LEFT, 0, SCRN_RIGHT - SCRN_LEFT, SCRN_BOTTOM, BLACK);
+void game_restart() {
+  FILL_RECT(SCRN_LEFT, 0, SCRN_RIGHT - SCRN_LEFT, SCRN_BOTTOM, BLACK);
+
   cannon_init(&cannon);
-  aliens_init(&aliens);
+  aliens_init(&aliens, g_game.stage);
   ufo_init(&ufo);
   draw_bunkers();
 
@@ -774,131 +931,93 @@ boolean game_restart() {
   bomb_init(&bombs[2]);
   bombs[2].draw_func = bomb_draw_c;
   bombs[2].shot_func = bomb_shot_c;
-
-  return true;
 }
 
 void game_main() {
 
-  if (cannon.show_hit > 1) {
-    cannon_erase(&cannon);
-    uint8_t *img = (uint8_t *)cannon_hit_img[(cannon.show_hit>>2) % 2];
-    arduboy.drawBitmap(cannon.x, CANNON_TOP, img, IV_W, IV_H, WHITE);
-    cannon.show_hit--;
-    return;
-  }
-  else if (cannon.show_hit == 1) {
-    gameStatus = GAME_LOST;
-    return;
-  }
+  cannon_update(&cannon);
 
-  if (cannon_process(&cannon)) {
-    cannon_erase(&cannon);
-    cannon_move(&cannon);
-    laser_shoot(&cannon.laser, cannon.x);
-    cannon_draw(&cannon);
-  }
-
-  if (cannon.laser.exists) {
-    laser_draw(&cannon.laser, BLACK);
-    laser_move(&cannon.laser);
-    laser_draw(&cannon.laser, WHITE);
-    int8_t hit = aliens_hit_test(&aliens, cannon.laser.x, cannon.laser.y);
-    if (hit >= 0) {
-      aliens_hit(&aliens, hit);
-      laser_draw(&cannon.laser, BLACK);
-      cannon.laser.exists = false;
+  if (cannon.status == OBJ_ACTIVE) {
+    uint8_t sc = laser_update(&cannon.laser);
+    if (sc > 0) {
+      g_game.score += sc;
+      print_score();
     }
-    if (ufo_hit_test(&ufo, cannon.laser.x, cannon.laser.y) >= 0) {
-      laser_draw(&cannon.laser, BLACK);
-      cannon.laser.exists = false;
-    }
-  }
-  else if (cannon.laser.show_misshot > 0) {
-    if (cannon.laser.show_misshot == IV_SHOW_HIT) {
-      laser_draw(&cannon.laser, BLACK);
-      laser_draw_misshot(&cannon.laser, WHITE);
-    }
-    else if (cannon.laser.show_misshot == 1)
-      laser_draw_misshot(&cannon.laser, BLACK);
-    cannon.laser.show_misshot--;
-  }
 
-  for(uint8_t i = 0 ; i < BOMB_NUM ; i++)
-    process_bomb(&bombs[i]);
+    for (uint8_t i = 0; i < BOMB_NUM; i++)
+      bomb_update(&bombs[i]);
 
-  process_ufo(&ufo);
+    ufo_update(&ufo);
 
-  if (aliens.show_hit == IV_SHOW_HIT) {
-    aliens_hitimg_erase_alien(&aliens);
-    aliens_hitimg_draw(&aliens);
-    aliens.show_hit--;
+    aliens_update(&aliens);
   }
-  else if (aliens.show_hit > 1) {
-    aliens.show_hit--;
-  }
-  else if (aliens.show_hit == 1) {
-    aliens_hitimg_erase(&aliens);
-    aliens.show_hit = 0;
-  }
-  else {
-    aliens_erase(&aliens);
-    aliens_draw(&aliens);
-    aliens_move(&aliens);
-  }
+}
+
+void print_game_over() {
+  FILL_RECT(33,23,60,37,BLACK);
+  arduboy.setCursor(37, 28);
+  arduboy.print(F("GAME OVER"));
 }
 
 void setup() {
   arduboy.begin();
   arduboy.clear();
-  arduboy.drawFastVLine(SCRN_LEFT - 1, 0, 64, WHITE);
-  arduboy.drawFastVLine(SCRN_RIGHT, 0, 64, WHITE);
-  draw7seg(109, 20, 0);
-  draw7seg(113, 20, 1);
-  draw7seg(117, 20, 2);
-  draw7seg(121, 20, 3);
-  draw7seg(125, 20, 4);
-  draw7seg(109, 28, 5);
-  draw7seg(113, 28, 6);
-  draw7seg(117, 28, 7);
-  draw7seg(121, 28, 8);
-  draw7seg(125, 28, 9);
+
+  DRAW_V_LINE(SCRN_LEFT - 1, 0, 64, WHITE);
+  DRAW_V_LINE(SCRN_RIGHT, 0, 64, WHITE);
+
+  print_int(125, 20, 0, 1);
+
+  DRAW_BITMAP(4, 22, cannon_img, CANNON_W, CANNON_H, WHITE);
+  print_cannon_left(0);
+
   arduboy.setFrameRate(60);
-  gameStatus = GAME_OVER;
+  g_game.status = GameOver;
 }
 
 void loop() {
   if (!(arduboy.nextFrame()))
     return;
 
-  switch (gameStatus) {
-  case GAME_RESTART:
-    if (game_restart()) { // true when initialization is done
-      gameStatus = GAME_ONGOING;
-    }
+  switch (g_game.status) {
+  case GameRestart:
+    game_restart();
+    g_game.status = GameOnGoing;
     break;
 
-  case GAME_ONGOING:
+  case GameOnGoing:
     game_main();
-    if ((aliens.alive == 0) && aliens.show_hit == 0) {
-      gameStatus = GAME_RESTART;
+    if (cannon.status == OBJ_READY) {
+      g_game.status = GameLost;
+    }
+    if ((aliens.alive == 0) && aliens.status == OBJ_ACTIVE) {
+      g_game.stage++;
+      g_game.status = GameRestart;
     }
     if (aliens.touch_down) {
-      gameStatus = GAME_OVER;
+      print_game_over();
+      g_game.status = GameOver;
     }
     break;
 
-  case GAME_LOST:
+  case GameLost:
+    print_cannon_left(--g_game.left);
     cannon_erase(&cannon);
     cannon_init(&cannon);
-    gameStatus = GAME_ONGOING;
+    if (g_game.left > 0)
+      g_game.status = GameOnGoing;
+    else {
+      print_game_over();
+      g_game.status = GameOver;
+    }
     break;
 
-  case GAME_OVER:
+  case GameOver:
     if (game_new_game()) { // true if A or B button is pushed
-      gameStatus = GAME_RESTART;
-      //erase_game_over();
-      //game_initialize();
+      game_initialize();
+      print_cannon_left(g_game.left);
+      print_score();
+      g_game.status = GameRestart;
     }
   }
 
