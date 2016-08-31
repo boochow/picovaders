@@ -1,2 +1,2 @@
-# picovader 0.1
-picovader is a space invaders style game for Arduboy.
+# picovaders 0.1
+picovaders is a space invaders-like game for Arduboy.
