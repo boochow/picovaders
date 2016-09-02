@@ -48,10 +48,9 @@ const uint8_t digit[10][3] PROGMEM = {
   { 0x3f, 0x25, 0x3f },
   { 0x27, 0x25, 0x3f },
 };
-const uint8_t fill_digit[3] PROGMEM = { 0x3f, 0x3f, 0x3f };
 
 void draw_digit(int16_t x, int16_t y, uint8_t n) {
-  DRAW_BITMAP(x, y, fill_digit, 3, 5, BLACK);
+  FILL_RECT(x, y, 3, 6, BLACK);
   DRAW_BITMAP(x, y, digit[n % 10], 3, 5, WHITE);
 }
 
@@ -245,7 +244,7 @@ void aliens_move(struct aliens_t *a) {
   }
 }
 
-void aliens_hit(struct aliens_t *a, uint16_t idx) {
+void aliens_hit(struct aliens_t *a, uint8_t idx) {
   a->exist[idx] = false;
   a->hit_idx = idx;
   a->status = ALN_EXPLOSION;
@@ -381,7 +380,7 @@ void ufo_hit(struct ufo_t *u, uint8_t idx) {
   u->img_idx = idx;
 }
 
-int16_t ufo_hit_test(struct ufo_t *u, uint16_t x, uint16_t y) {
+boolean ufo_hit_test(struct ufo_t *u, uint16_t x, uint16_t y) {
   if ((u->status == OBJ_ACTIVE) && 
     (y < UFO_BOTTOM) && 
     (x >= u->x) && (x < u->x + UFO_W)) {
@@ -389,9 +388,10 @@ int16_t ufo_hit_test(struct ufo_t *u, uint16_t x, uint16_t y) {
     ufo_init(u);
     u->status = UFO_EXPLOSION;
     ufo_erase(u);
+    return true;
   }
   else
-    return -1;
+    return false;
 }
 
 void ufo_update(struct ufo_t *u) {
@@ -464,8 +464,6 @@ void bomb_draw(struct bomb_t *b, uint8_t color) {
 }
 
 void bomb_draw_a(struct bomb_t *b, uint8_t color) {
-  if (b->status != OBJ_ACTIVE)
-    return;
   DRAW_PIXEL(b->x + ((1+ b->y) % 2), b->y - 3, color);
   DRAW_PIXEL(b->x + (b->y/BOMB_V % 2), b->y - 2, color);
   DRAW_PIXEL(b->x + ((1+ b->y) % 2), b->y - 1, color);
@@ -473,8 +471,6 @@ void bomb_draw_a(struct bomb_t *b, uint8_t color) {
 }
 
 void bomb_draw_b(struct bomb_t *b, uint8_t color) {
-  if (b->status != OBJ_ACTIVE)
-    return;
   DRAW_PIXEL(b->x + 1, b->y - 1 - (b->y / BOMB_V % 2), color);
   DRAW_PIXEL(b->x, b->y - 1 - (b->y / BOMB_V % 2), color);
   DRAW_PIXEL(b->x + 1, b->y, color);
@@ -482,8 +478,6 @@ void bomb_draw_b(struct bomb_t *b, uint8_t color) {
 }
 
 void bomb_draw_c(struct bomb_t *b, uint8_t color) {
-  if (b->status != OBJ_ACTIVE)
-    return;
   DRAW_PIXEL(b->x + ((1 + b->y) / BOMB_V % 2), b->y - 2, color);
   DRAW_PIXEL(b->x + 1, b->y - 1, color);
   DRAW_PIXEL(b->x, b->y - 1, color);
@@ -668,7 +662,7 @@ uint8_t laser_update(struct laser_t *l) { // returns point if laser hits
   uint8_t result = 0;
 
   switch (l->status) {
-  case OBJ_READY:
+  case OBJ_READY: // laser shot in cannon_update()
     break;
   case OBJ_ACTIVE:
     laser_draw(l, BLACK);
@@ -680,7 +674,7 @@ uint8_t laser_update(struct laser_t *l) { // returns point if laser hits
       result = alien_points[A_ROW(hit)];
       l->status = OBJ_READY;
     } 
-    else if (ufo_hit_test(&g_ufo, l->x, l->y) >= 0) {
+    else if (ufo_hit_test(&g_ufo, l->x, l->y)) {
       uint8_t idx = laser_ufo_point(l);
       ufo_hit(&g_ufo, idx);
       result = ufo_points[idx];
@@ -696,7 +690,6 @@ uint8_t laser_update(struct laser_t *l) { // returns point if laser hits
           ((l->y == bombs[i].y) || (l->y == 1 + bombs[i].y)))
           l->status = LASER_EXPLOSION;
       }
-
     }
     if (l->status == OBJ_ACTIVE)
       laser_draw(l, WHITE);
@@ -884,7 +877,7 @@ void print_cannon_left(uint8_t n) {
 #define TITLE_W 64
 #define TITLE_H 8
 
-void game_title() {
+void game_title_draw() {
   static const uint8_t title_img[TITLE_W] PROGMEM = {
     0xf8, 0xfc, 0x24, 0x24, 0x3c, 0x18, 0,
     0x3d, 0x3d, 0, 0,
@@ -900,10 +893,10 @@ void game_title() {
   DRAW_BITMAP(TITLE_LEFT, TITLE_TOP, title_img, TITLE_W, TITLE_H, WHITE);
 }
 
-void game_title_alien(int16_t y0, uint8_t c) {
+void game_title_alien_draw(int16_t y0, uint8_t c) {
   for (uint8_t i = 0; i < 8; i++) {
     int16_t x = TITLE_LEFT - 4 + ALN_W * i;
-    int16_t y = y0 - ALN_H * (8 - i);
+    int16_t y = y0 - 20 + ALN_H * i;
     switch (i / 3) {
     case 0: DRAW_BITMAP(x, y, aln3_img[y0/8 % 2], ALN_W, ALN_H, c); break;
     case 1: DRAW_BITMAP(x, y, aln2_img[y0/8 % 2], ALN_W, ALN_H, c); break;
@@ -912,15 +905,17 @@ void game_title_alien(int16_t y0, uint8_t c) {
   }
   for (uint8_t i = 8; i < 15; i++) {
     int16_t x = TITLE_LEFT - 4 + ALN_W * i;
-    int16_t y = y0 - ALN_H * (i - 6);
+    int16_t y = y0 - 20 + ALN_H * (14 - i);
     switch ((14-i) / 3) {
     case 0: DRAW_BITMAP(x, y, aln3_img[y0/8 % 2], ALN_W, ALN_H, c); break;
     case 1: DRAW_BITMAP(x, y, aln2_img[y0/8 % 2], ALN_W, ALN_H, c); break;
     default: DRAW_BITMAP(x, y, aln1_img[y0/8 % 2], ALN_W, ALN_H, c);
     }
   }
-  DRAW_BITMAP(TITLE_LEFT + (TITLE_W - UFO_W) / 2 - 2, y0 - ALN_H * 25, ufo_img, UFO_W, UFO_H, c);
-  DRAW_BITMAP(TITLE_LEFT + (TITLE_W - UFO_W) / 2 + UFO_W, y0 - ALN_H * 25, ufo_img, UFO_W, UFO_H, c);
+  int16_t x1 = UFO_W * 23 - y0;
+  int16_t x2 = y0 - UFO_W * 5;
+  DRAW_BITMAP(x1, TITLE_TOP, ufo_img, UFO_W, UFO_H, c);
+  DRAW_BITMAP(x2, TITLE_TOP + UFO_H, ufo_img, UFO_W, UFO_H, c);
 }
 
 void draw_game_field() {
@@ -1004,6 +999,8 @@ void game_main() {
   if (g_cannon.status == OBJ_ACTIVE) {
     uint8_t sc = laser_update(&g_cannon.laser);
     if (sc > 0) {
+      if ((g_game.score < 1500) && (g_game.score + sc > 1500)) 
+        print_cannon_left(++g_game.left);
       g_game.score += sc;
       print_score();
     }
@@ -1031,7 +1028,7 @@ void setup() {
   g_game.status = GameTitle;
 }
 
-#define TITLE_TIME 240
+#define TITLE_TIME 200
 
 void loop() {
   if (!(arduboy.nextFrame()))
@@ -1102,15 +1099,15 @@ void loop() {
     case 10:
     case 30:
     case 50:
-      game_title();
+      game_title_draw();
       break;
-    case 500:
+    case 600:
       passed_time = 0;
       break;
     default:
-      if ((passed_time > 120) && (passed_time % 2)) {
-        game_title_alien(passed_time / 2 - 61, BLACK);
-        game_title_alien(passed_time / 2 - 60, WHITE);
+      if ((passed_time > 60) && (passed_time % 3 == 0)) {
+        game_title_alien_draw(passed_time / 3 - 21, BLACK);
+        game_title_alien_draw(passed_time / 3 - 20, WHITE);
       }
       break;
     }
