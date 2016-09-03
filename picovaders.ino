@@ -512,7 +512,7 @@ void draw_bunkers() {
 #define BOMB_WAIT 3
 #define BOMB_V 2
 #define BOMB_EXPLOSION 18
-#define BOMB_SHOT_INTERVAL 59
+#define BOMB_SHOT_INTERVAL 60
 
 struct bomb_t {
   int16_t x;
@@ -567,7 +567,7 @@ void bomb_shot_from(struct bomb_t *b, uint8_t a_idx) {
     a_idx -= ALN_COLUMN;
   b->status = OBJ_ACTIVE;
   b->x = g_aliens.nxt_left + A_XOFS(A_COL(a_idx)) + ALN_W / 2 - 1;
-  b->y = g_aliens.nxt_top + A_YOFS(A_ROW(a_idx)) + 2 * ALN_H + ALN_VSPACING;
+  b->y = g_aliens.nxt_top + A_YOFS(A_ROW(a_idx)) + 2 * (ALN_H + ALN_VSPACING);
 }
 
 void bomb_shot_a(struct bomb_t *b) {
@@ -624,8 +624,13 @@ void bomb_move(struct bomb_t *b) {
 }
 
 void bomb_shot(struct bomb_t *b) {
-  if (b->wait_ctr++ > BOMB_SHOT_INTERVAL) {
+  static uint8_t last_shot = 0;
+  
+  last_shot++;
+  b->wait_ctr++;
+  if ((b->wait_ctr > BOMB_SHOT_INTERVAL) && (last_shot > BOMB_SHOT_INTERVAL / BOMB_NUM)) {
     b->shot_func(b);
+    last_shot = 0;
   }
 }
 
