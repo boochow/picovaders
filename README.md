@@ -15,3 +15,6 @@ You have 3 cannons. One cannon will be added when your score reached 1500 points
 1. Download Zip or Git Clone from: https://github.com/boochow/picovaders
 2. Open picovaders.ino with Arduino IDE
 3. Upload to your Arduboy
+
+##Tips
+You may need a magnifying glass :-)
