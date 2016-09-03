@@ -1,6 +1,6 @@
 # picovaders
 ##Description
-picovaders is a space invaders-like game for Arduboy.
+picovaders is a space invaders-like shooting game for Arduboy.
 
 ##Instructions
 Move the cannon and hit the aliens and UFOs.
