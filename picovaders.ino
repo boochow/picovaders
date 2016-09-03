@@ -838,8 +838,9 @@ void cannon_hit(struct cannon_t *c) {
   c->status = CANNON_EXPLOSION;
   switch (c->laser.status) {
   case OBJ_ACTIVE: laser_draw(&c->laser, BLACK); break;
-  case LASER_EXPLOSION: laser_draw_explosion(&c->laser, BLACK); break;
-  default:break;
+  case OBJ_READY: break;
+  default:
+    laser_draw_explosion(&c->laser, BLACK);
   }
   c->laser.status = OBJ_RECYCLE;
 }
@@ -1176,9 +1177,20 @@ void game_sound_main() {
   default: break;
   }
 
-  sound_play(&bgm);
-  for(uint8_t i = 0; i < SOUND_FX_NUM ; i++)
-    sound_play(&snd_fx[i]);
+  switch (g_game.status) {
+  case GameOnGoing:
+    sound_play(&bgm);
+    for (uint8_t i = 0; i < SOUND_FX_NUM; i++)
+      sound_play(&snd_fx[i]);
+    break;
+  default:
+    sound_stop(&bgm);
+    sound_restart(&bgm);
+    for (uint8_t i = 0; i < SOUND_FX_NUM; i++) {
+      sound_stop(&snd_fx[i]);
+      sound_restart(&snd_fx[i]);
+    }
+  }
 }
 
 void print_game_over() {
