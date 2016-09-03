@@ -1,16 +1,10 @@
 #include "Arduboy.h"
 
-// ALN_wait[0] = num of aliens, ALN_wait[1] = wait in ticks
-#define ALN_WAIT_SIZE 10
-const uint8_t ALN_wait[2][ALN_WAIT_SIZE] = {
-  { 40, 34, 28, 22, 16, 12,  8,  4,  2,  1 },
-  { 10, 9, 7, 6, 5, 4, 3, 2,  1,  0 }
-};
-
+#define MAXINT16 65535
 
 Arduboy arduboy;
 
-#define DRAW_PIXEL(x,y,c)   arduboy.drawPixel((x), (y), (c));
+#define DRAW_PIXEL(x,y,c)    arduboy.drawPixel((x), (y), (c));
 #define GET_PIXEL(x,y)      arduboy.getPixel((x), (y))
 #define DRAW_BITMAP(x,y,b,w,h,c) arduboy.drawBitmap((x), (y), (b), (w), (h), (c))
 #define DRAW_RECT(x,y,w,h,c)  arduboy.drawRect((x), (y), (w), (h), (c))
@@ -23,19 +17,16 @@ Arduboy arduboy;
 #define KEY_PRESSED(k)    arduboy.pressed((k))
 #define KEY_NOT_PRESSED(k)  arduboy.notPressed((k))
 
+#define TONE(f,d)     arduboy.tunes.tone((f), (d))
+#define SOUND_ON      arduboy.audio.on()
+#define SOUND_OFF     arduboy.audio.off()
+
 #define SCRN_LEFT  19
 #define SCRN_RIGHT 107
 #define SCRN_BOTTOM 64
 
-#define MAXINT16 65535
 
-boolean sound_on = true;
-
-void ToneWithMute(unsigned int frequency, unsigned long duration) {
-  if (sound_on)
-    arduboy.tunes.tone(frequency, duration);
-}
-
+// 3x6 pixel digit font
 const uint8_t digit[10][3] PROGMEM = {
   { 0x3f, 0x21, 0x3f },
   { 0x00, 0x3f, 0x00 },
@@ -62,6 +53,84 @@ void print_int(int16_t x, int16_t y, uint16_t s, uint8_t digit) {
     s /= 10;
   }
 }
+
+// Sound utilities
+
+#include "pitches.h"
+
+enum SoundState {
+  SoundReady,
+  SoundPlaying,
+  SoundDone
+};
+
+struct sound_fx_t {
+  int16_t *data;    // array of frequencies, use -1 as end marker
+  uint8_t gate_time;  // note gate time in ticks(1/60 sec)
+  uint8_t clk;    // ticks per note
+  boolean loop;   // true for loop play
+  uint8_t idx;
+  uint8_t clk_cnt;
+  enum SoundState status;
+};
+
+void sound_start(struct sound_fx_t *s) {
+  if (s->status == SoundReady) {
+    s->status = SoundPlaying;
+    s->clk_cnt = 0;
+    s->idx = 0;
+  }
+}
+
+void sound_stop(struct sound_fx_t *s) {
+  if (s->status == SoundPlaying) {
+    s->status = SoundDone;
+  }
+}
+
+void sound_restart(struct sound_fx_t *s) {
+  if (s->status == SoundDone) {
+    s->status = SoundReady;
+  }
+}
+
+boolean sound_ready(struct sound_fx_t *s) {
+  return (s->status == SoundReady);
+}
+
+void sound_set_tempo(struct sound_fx_t *s, uint8_t t) {
+  s->clk = t;
+}
+
+void sound_play(struct sound_fx_t *s) {
+  if ((s->status == SoundPlaying) && (s->clk_cnt-- == 0)) {
+    s->clk_cnt = s->clk;
+    TONE(s->data[s->idx++], 18 * s->gate_time);
+    if (s->data[s->idx] < 0) {
+      if (!s->loop)
+        s->status = SoundDone;
+      s->idx = 0;
+    }
+  }
+}
+
+
+// true when a button pressed and released
+boolean button_pressed(uint8_t button, boolean *b_state) {
+  if (*b_state && KEY_NOT_PRESSED(button)) {
+    *b_state = false;
+    return true;
+  }
+  else if (!*b_state && KEY_PRESSED(button)) {
+    *b_state = true;
+  }
+  return false;
+}
+
+
+/////////////////////////////////////////////////////////
+//  Common status definition
+/////////////////////////////////////////////////////////
 
 #define OBJ_ACTIVE 0  // object is visible and moving
 #define OBJ_READY -1  // object is not active but ready to be active
@@ -256,26 +325,22 @@ int8_t aliens_hit_test(struct aliens_t *a, int16_t x, int16_t y) { // returns al
   int16_t tmin = min(a->cur_top, a->nxt_top);
 
   if ((x > lmin) && (x < lmin + ALN_W_OF_ALIENS) &&
-    (y > tmin) && (y < tmin + ALN_H_OF_ALIENS))
-  {
-    for (uint8_t i = 0; i < a->nxt_update ; i++) {
+    (y > tmin) && (y < tmin + ALN_H_OF_ALIENS)) {
+    for (uint8_t i = 0; i < a->nxt_update ; i++)
       if (a->exist[i]) {
         int16_t ax = a->nxt_left + A_XOFS(A_COL(i));
         int16_t ay = a->nxt_top + A_YOFS(A_ROW(i));
-        if ((x >= ax) && (x < ax + ALN_W) && (y >= ay) && (y < ay + ALN_H)) {
+        if ((x >= ax) && (x < ax + ALN_W) && (y >= ay) && (y < ay + ALN_H))
           return i;
-        }
       }
-    }
-    for (uint8_t i = a->nxt_update; i < ALN_NUM ; i++) {
+
+    for (uint8_t i = a->nxt_update; i < ALN_NUM ; i++)
       if (a->exist[i]) {
         int16_t ax = a->cur_left + A_XOFS(A_COL(i));
         int16_t ay = a->cur_top + A_YOFS(A_ROW(i));
-        if ((x >= ax) && (x < ax + ALN_W) && (y >= ay) && (y < ay + ALN_H)) {
+        if ((x >= ax) && (x < ax + ALN_W) && (y >= ay) && (y < ay + ALN_H))
           return i;
-        }
       }
-    }
   }
   return -1; // no aliens hits
 }
@@ -298,7 +363,6 @@ void aliens_update(struct aliens_t *a) {
     break;
   default:
     a->status--;
-
   }
 }
 
@@ -767,12 +831,16 @@ void cannon_move(struct cannon_t *c) {
 
 void cannon_hit(struct cannon_t *c) {
   c->status = CANNON_EXPLOSION;
-  laser_draw(&c->laser, BLACK);
+  switch (c->laser.status) {
+  case OBJ_ACTIVE: laser_draw(&c->laser, BLACK); break;
+  case LASER_EXPLOSION: laser_draw_explosion(&c->laser, BLACK); break;
+  default:break;
+  }
   c->laser.status = OBJ_RECYCLE;
 }
 
 boolean cannon_hit_test(struct cannon_t *c, uint16_t x, uint16_t y) {
-  if ((y > CANNON_TOP) && (y < CANNON_TOP - 1 + CANNON_H) && 
+  if ((y > CANNON_TOP) && (y < CANNON_TOP + CANNON_H) && 
     (x >= c->x) && (x <= c->x + CANNON_W)) {
     return true;
   }
@@ -855,9 +923,9 @@ struct game_t {
   game_status_t status;
 }g_game;
 
-#define SC_X 109
+#define SC_X 109  // score display location
 #define SC_Y 20
-#define HSC_Y 30
+#define HSC_Y 30  // high-score display location
 
 void print_score() {
   print_int(SC_X, SC_Y, g_game.score, 4);
@@ -937,34 +1005,19 @@ void game_initialize() {
   g_game.left = 3;
 }
 
-boolean game_new_game()
-{
+boolean game_new_game() {
   static boolean pressed_A = false;
   static boolean pressed_B = false;
-  boolean result;
 
-  result = false;
-  if (pressed_A && KEY_NOT_PRESSED(A_BUTTON)) {
-    pressed_A = false;
-    sound_on = true;
-    result = true;
+  if (button_pressed(A_BUTTON, &pressed_A)) {
+    SOUND_ON;
+    return true;
   }
-  else if (!pressed_A && KEY_PRESSED(A_BUTTON)) {
-    pressed_A = true;
-  }
-
-  if (!result) {
-    if (pressed_B && KEY_NOT_PRESSED(B_BUTTON)) {
-      pressed_B = false;
-      sound_on = false;
-      result = true;
-    }
-    else if (!pressed_B && KEY_PRESSED(B_BUTTON)) {
-      pressed_B = true;
-    }
-  }
-
-  return result;
+  else if (button_pressed(B_BUTTON, &pressed_B)) {
+    SOUND_OFF;
+    return true;
+  } else
+    return false;
 }
 
 void bomb_init_all() {
@@ -992,14 +1045,14 @@ void game_restart() {
   bomb_init_all();
 }
 
+#define SCORE_1UP 150
+
 void game_main() {
-
   cannon_update(&g_cannon);
-
   if (g_cannon.status == OBJ_ACTIVE) {
     uint8_t sc = laser_update(&g_cannon.laser);
     if (sc > 0) {
-      if ((g_game.score < 1500) && (g_game.score + sc > 1500)) 
+      if ((g_game.score < SCORE_1UP) && (g_game.score + sc > SCORE_1UP))
         print_cannon_left(++g_game.left);
       g_game.score += sc;
       print_score();
@@ -1012,6 +1065,115 @@ void game_main() {
 
     aliens_update(&g_aliens);
   }
+}
+
+#define SOUND_FX_NUM 5
+#define SND_LASER 0
+#define SND_ALIEN 1
+#define SND_UFOFLY 2
+#define SND_UFOHIT 3
+#define SND_CANNON 4
+
+int16_t snd1[5] = {   // laser
+  NOTE_B6, NOTE_C7, 0, NOTE_B6, -1
+};
+
+int16_t snd2[25] = {  // alien explosion
+  NOTE_G5, NOTE_FS5, NOTE_F5, NOTE_E5, 0,
+  NOTE_A6, NOTE_GS6, NOTE_G6, NOTE_FS6, NOTE_F6,
+  NOTE_E6, NOTE_DS6, NOTE_D6, NOTE_CS6, NOTE_C6,
+  NOTE_B5, NOTE_AS5,
+  NOTE_E6, NOTE_DS6, NOTE_D6, NOTE_CS6,-1
+};
+
+int16_t snd3[13] = {  // ufo flying
+  120, 241, 570, 1020, 1470, 1800, 1920, 1800, 1470, 1020, 570, 241, -1
+};
+
+int16_t snd4[13] = {  // ufo explosion
+  120, 180, 345, 570, 795, 960, 1020, 960, 795, 570, 345, 180, -1
+};
+
+int16_t snd5[3] = {   // cannon explosion
+  NOTE_B2, 0, -1
+};
+
+
+struct sound_fx_t snd_fx[SOUND_FX_NUM] = {
+  { snd1, 1, 0, false, 0, 0, SoundReady },  // data, gate_time, clk, repeat, (internal vars)
+  { snd2, 1, 0, false, 0, 0, SoundReady },
+  { snd3, 1, 0, true, 0, 0, SoundReady },
+  { snd4, 1, 0, true, 0, 0, SoundReady },
+  { snd5, 1, 0, true, 0, 0, SoundReady }
+};
+
+int16_t bgm_s[5] = {
+  NOTE_E3, NOTE_D3, NOTE_C3, NOTE_B2, -1
+};
+
+struct sound_fx_t bgm = { bgm_s, 4, 52, true, 0, false };
+
+#define BGM_STEP_NUM 10
+
+uint8_t bgm_speed[BGM_STEP_NUM] =   { 52, 44, 36, 28, 23, 18, 13, 10, 7, 5 };
+uint8_t bgm_alien_num[BGM_STEP_NUM] = { 50, 40, 30, 22, 16, 12,  8,  4, 2, 1 };
+
+void game_sound_main() {
+  switch (g_aliens.status) {
+  case OBJ_ACTIVE:
+    for (uint8_t i = 0; i < BGM_STEP_NUM; i++)
+      if (g_aliens.alive == bgm_alien_num[i])
+        sound_set_tempo(&bgm, bgm_speed[i]);
+    sound_start(&bgm);
+    break;
+  case ALN_EXPLOSION - 1:
+    if (sound_ready(&snd_fx[SND_ALIEN]))
+      sound_start(&snd_fx[SND_ALIEN]);
+    break;
+  default:
+    sound_restart(&snd_fx[SND_ALIEN]);
+    break;
+  }
+
+  switch (g_ufo.status) {
+  case OBJ_ACTIVE: sound_start(&snd_fx[SND_UFOFLY]); break;
+  case UFO_EXPLOSION - 1:
+    sound_stop(&snd_fx[SND_UFOFLY]);
+    sound_start(&snd_fx[SND_UFOHIT]);
+    break;
+  case OBJ_RECYCLE:
+    sound_stop(&snd_fx[SND_UFOFLY]);
+    sound_restart(&snd_fx[SND_UFOFLY]);
+    sound_stop(&snd_fx[SND_UFOHIT]);
+    sound_restart(&snd_fx[SND_UFOHIT]);
+    break;
+  default:
+    break;
+  }
+
+  switch (g_cannon.status) {
+  case CANNON_EXPLOSION - 1: sound_start(&snd_fx[SND_CANNON]); break;
+  case OBJ_RECYCLE:
+    sound_stop(&snd_fx[SND_CANNON]);
+    sound_restart(&snd_fx[SND_CANNON]);
+    break;
+  default:
+    break;
+  }
+
+  switch (g_cannon.laser.status) {
+  case OBJ_ACTIVE:
+    if (sound_ready(&snd_fx[SND_LASER]))
+      sound_start(&snd_fx[SND_LASER]);
+    break;
+  case OBJ_RECYCLE: sound_stop(&snd_fx[SND_LASER]); break;
+  case OBJ_READY: sound_restart(&snd_fx[SND_LASER]); break;
+  default: break;
+  }
+
+  sound_play(&bgm);
+  for(uint8_t i = 0; i < SOUND_FX_NUM ; i++)
+    sound_play(&snd_fx[i]);
 }
 
 void print_game_over() {
@@ -1055,6 +1217,7 @@ void loop() {
       print_game_over();
       g_game.status = GameOver;
     }
+    game_sound_main();
     break;
 
   case GameLost:
