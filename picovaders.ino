@@ -528,9 +528,9 @@ void bomb_draw(struct bomb_t *b, uint8_t color) {
 }
 
 void bomb_draw_a(struct bomb_t *b, uint8_t color) {
-  DRAW_PIXEL(b->x + ((1+ b->y) % 2), b->y - 3, color);
+  DRAW_PIXEL(b->x + ((1+ b->y/BOMB_V) % 2), b->y - 3, color);
   DRAW_PIXEL(b->x + (b->y/BOMB_V % 2), b->y - 2, color);
-  DRAW_PIXEL(b->x + ((1+ b->y) % 2), b->y - 1, color);
+  DRAW_PIXEL(b->x + ((1+ b->y/BOMB_V) % 2), b->y - 1, color);
   DRAW_PIXEL(b->x + (b->y/BOMB_V % 2), b->y, color);
 }
 
