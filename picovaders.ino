@@ -66,7 +66,7 @@ enum SoundState {
 
 struct sound_fx_t {
   int16_t *data;    // array of frequencies, use -1 as end marker
-  uint8_t gate_time;  // note gate time in ticks(1/60 sec)
+  uint8_t gate_time;  // note gate time in msec
   uint8_t clk;    // ticks per note
   boolean loop;   // true for loop play
   uint8_t idx;
@@ -105,7 +105,7 @@ void sound_set_tempo(struct sound_fx_t *s, uint8_t t) {
 void sound_play(struct sound_fx_t *s) {
   if ((s->status == SoundPlaying) && (s->clk_cnt-- == 0)) {
     s->clk_cnt = s->clk;
-    TONE(s->data[s->idx++], 18 * s->gate_time);
+    TONE(s->data[s->idx++], s->gate_time);
     if (s->data[s->idx] < 0) {
       if (!s->loop)
         s->status = SoundDone;
@@ -567,7 +567,7 @@ void bomb_shot_from(struct bomb_t *b, uint8_t a_idx) {
     a_idx -= ALN_COLUMN;
   b->status = OBJ_ACTIVE;
   b->x = g_aliens.nxt_left + A_XOFS(A_COL(a_idx)) + ALN_W / 2 - 1;
-  b->y = g_aliens.nxt_top + A_YOFS(A_ROW(a_idx)) + 2 * (ALN_H + ALN_VSPACING);
+  b->y = g_aliens.nxt_top + A_YOFS(A_ROW(a_idx)) + ALN_H + ALN_VSPACING;
 }
 
 void bomb_shot_a(struct bomb_t *b) {
@@ -591,20 +591,19 @@ void bomb_init(struct bomb_t *b) {
 
 void bomb_hitimg_draw(struct bomb_t *b, uint8_t color) {
   DRAW_PIXEL(b->x, b->y, color);
-  DRAW_PIXEL(b->x+1, b->y, color);
-  DRAW_PIXEL(b->x, b->y-1, color);
-  DRAW_PIXEL(b->x+1, b->y-1, color);
+  DRAW_PIXEL(b->x + 1, b->y, color);
+  DRAW_PIXEL(b->x, b->y - 1, color);
+  DRAW_PIXEL(b->x + 1, b->y-1, color);
 }
 
 boolean bomb_bunker_test(struct bomb_t *b) {
-  if ((b->y < BUNKER_BOTTOM) && (b->y > BUNKER_TOP)) {
+  if ((b->y < BUNKER_BOTTOM) && (b->y > BUNKER_TOP))
     if (GET_PIXEL(b->x, b->y) ||
       GET_PIXEL(b->x + 1, b->y ) ||
       GET_PIXEL(b->x, b->y - 1) ||
       GET_PIXEL(b->x + 1, b->y - 1)) {
       return true;
     }
-  }
   return false;
 }
 
@@ -626,9 +625,7 @@ void bomb_move(struct bomb_t *b) {
 void bomb_shot(struct bomb_t *b) {
   static uint8_t last_shot = 0;
   
-  last_shot++;
-  b->wait_ctr++;
-  if ((b->wait_ctr > BOMB_SHOT_INTERVAL) && (last_shot > BOMB_SHOT_INTERVAL / BOMB_NUM)) {
+  if ((++b->wait_ctr > BOMB_SHOT_INTERVAL) && (++last_shot > BOMB_SHOT_INTERVAL / BOMB_NUM)) {
     b->shot_func(b);
     last_shot = 0;
   }
@@ -663,20 +660,17 @@ void laser_draw_explosion(struct laser_t *l, uint8_t color) {
 }
 
 boolean laser_bunker_test(struct laser_t *l) {
-  if ((l->y < BUNKER_BOTTOM) && (l->y > BUNKER_TOP) && (l->y > g_aliens.bottom)) {
-    if (GET_PIXEL(l->x, l->y) || (GET_PIXEL(l->x, l->y + 1))) {
+  if ((l->y < BUNKER_BOTTOM) && (l->y > BUNKER_TOP) && (l->y > g_aliens.bottom))
+    if (GET_PIXEL(l->x, l->y) || (GET_PIXEL(l->x, l->y + 1)))
       return true;
-    }
-  }
   return false;
 }
 
 void laser_move(struct laser_t *l) {
   if (l->status == OBJ_ACTIVE) {
     l->y -= LASER_V;
-    if (l->y <= 0) {
+    if (l->y <= 0)
       l->status = LASER_EXPLOSION;
-    }
   }
 }
 
@@ -686,7 +680,7 @@ void laser_draw(struct laser_t *l, uint8_t color) {
 }
 
 void laser_shoot(struct laser_t *l, uint16_t x, uint16_t y) {
-  if ((l->status == OBJ_READY) && (g_aliens.status == OBJ_ACTIVE)) {
+  if ((l->status == OBJ_READY) && (g_aliens.status == OBJ_ACTIVE))
     if (KEY_PRESSED(A_BUTTON) || KEY_PRESSED(B_BUTTON)) {
       l->status = OBJ_ACTIVE;
       l->x = x;
@@ -694,7 +688,6 @@ void laser_shoot(struct laser_t *l, uint16_t x, uint16_t y) {
       l->shot_ctr = (l->shot_ctr + 1) % LASER_CNTR_MOD;
       g_ufo.l_or_r = l->shot_ctr & 0x1;
     }
-  }
 }
 
 uint8_t laser_ufo_point(struct laser_t *l) {
@@ -846,7 +839,8 @@ void cannon_hit(struct cannon_t *c) {
 }
 
 boolean cannon_hit_test(struct cannon_t *c, uint16_t x, uint16_t y) {
-  if ((y > CANNON_TOP) && (y < CANNON_TOP + CANNON_H) && 
+  if ((y > g_aliens.bottom + 2*ALN_H + ALN_VSPACING) &&
+    (y > CANNON_TOP) && (y < CANNON_TOP + CANNON_H) &&
     (x >= c->x) && (x <= c->x + CANNON_W)) {
     return true;
   }
@@ -1106,18 +1100,18 @@ int16_t snd5[3] = {   // cannon explosion
 
 
 struct sound_fx_t snd_fx[SOUND_FX_NUM] = {
-  { snd1, 1, 0, false, 0, 0, SoundReady },  // data, gate_time, clk, repeat, (internal vars)
-  { snd2, 1, 0, false, 0, 0, SoundReady },
-  { snd3, 1, 0, true, 0, 0, SoundReady },
-  { snd4, 1, 0, true, 0, 0, SoundReady },
-  { snd5, 1, 0, true, 0, 0, SoundReady }
+  { snd1, 20, 0, false, 0, 0, SoundReady }, // data, gate_time, clk, repeat, (internal vars)
+  { snd2, 20, 0, false, 0, 0, SoundReady },
+  { snd3, 20, 0, true, 0, 0, SoundReady },
+  { snd4, 20, 0, true, 0, 0, SoundReady },
+  { snd5, 20, 0, true, 0, 0, SoundReady }
 };
 
 int16_t bgm_s[5] = {
   NOTE_E3, NOTE_D3, NOTE_C3, NOTE_B2, -1
 };
 
-struct sound_fx_t bgm = { bgm_s, 4, 52, true, 0, false };
+struct sound_fx_t bgm = { bgm_s, 70, 52, true, 0, false };
 
 #define BGM_STEP_NUM 10
 
