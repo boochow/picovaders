@@ -563,7 +563,7 @@ int8_t search_alien(struct aliens_t *a, int8_t x) {
 }
 
 void bomb_shot_from(struct bomb_t *b, uint8_t a_idx) {
-  while ((a_idx > ALN_COLUMN) && g_aliens.exist[a_idx - ALN_COLUMN])
+  while ((a_idx >= ALN_COLUMN) && g_aliens.exist[a_idx - ALN_COLUMN])
     a_idx -= ALN_COLUMN;
   b->status = OBJ_ACTIVE;
   b->x = g_aliens.nxt_left + A_XOFS(A_COL(a_idx)) + ALN_W / 2 - 1;
