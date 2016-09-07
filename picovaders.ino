@@ -83,15 +83,13 @@ void sound_start(struct sound_fx_t *s) {
 }
 
 void sound_stop(struct sound_fx_t *s) {
-  if (s->status == SoundPlaying) {
+  if (s->status == SoundPlaying)
     s->status = SoundDone;
-  }
 }
 
 void sound_restart(struct sound_fx_t *s) {
-  if (s->status == SoundDone) {
+  if (s->status == SoundDone)
     s->status = SoundReady;
-  }
 }
 
 boolean sound_ready(struct sound_fx_t *s) {
@@ -121,9 +119,8 @@ boolean button_pressed(uint8_t button, boolean *b_state) {
     *b_state = false;
     return true;
   }
-  else if (!*b_state && KEY_PRESSED(button)) {
+  else if (!*b_state && KEY_PRESSED(button))
     *b_state = true;
-  }
   return false;
 }
 
@@ -438,7 +435,6 @@ void ufo_move(struct ufo_t *u) {
 }
 
 void ufo_hit(struct ufo_t *u, uint8_t idx) {
-  ufo_init(u);
   u->status = UFO_EXPLOSION;
   ufo_erase(u);
   u->img_idx = idx;
@@ -449,7 +445,6 @@ boolean ufo_hit_test(struct ufo_t *u, uint16_t x, uint16_t y) {
     (y < UFO_BOTTOM) && 
     (x >= u->x) && (x < u->x + UFO_W)) {
 
-    ufo_init(u);
     u->status = UFO_EXPLOSION;
     ufo_erase(u);
     return true;
@@ -839,8 +834,7 @@ void cannon_hit(struct cannon_t *c) {
 }
 
 boolean cannon_hit_test(struct cannon_t *c, uint16_t x, uint16_t y) {
-  if ((y > g_aliens.bottom + 2*ALN_H + ALN_VSPACING) &&
-    (y > CANNON_TOP) && (y < CANNON_TOP + CANNON_H) &&
+  if ((y > CANNON_TOP) && (y < CANNON_TOP + CANNON_H) &&
     (x >= c->x) && (x <= c->x + CANNON_W)) {
     return true;
   }
