@@ -929,7 +929,6 @@ void print_high_score() {
   print_int(SC_X, HSC_Y, g_game.high_score, 4);
 }
 
-
 void print_cannon_left(uint8_t n) {
   draw_digit(13, 20, n);
 }
@@ -980,93 +979,14 @@ void game_title_alien_draw(int16_t y0, uint8_t c) {
   DRAW_BITMAP(x2, TITLE_TOP + UFO_H, ufo_img, UFO_W, UFO_H, c);
 }
 
-void draw_game_field() {
-  DRAW_V_LINE(SCRN_LEFT - 1, 0, 64, WHITE);
-  DRAW_V_LINE(SCRN_RIGHT, 0, 64, WHITE);
-
-  print_int(SC_X + 16, SC_Y, 0, 1);
-  print_int(SC_X + 16, HSC_Y, 0, 1);
-  print_high_score();
-
-  DRAW_BITMAP(4, 22, cannon_img, CANNON_W, CANNON_H, WHITE);
-  print_cannon_left(0);
-}
-
-void game_initialize() {
-  g_game.score = 0;
-  g_game.high_score = 0;
-  g_game.stage = 0;
-  g_game.left = 3;
-}
-
-boolean game_new_game() {
-  static boolean pressed_A = false;
-  static boolean pressed_B = false;
-
-  if (button_pressed(A_BUTTON, &pressed_A)) {
-    SOUND_ON;
-    return true;
-  }
-  else if (button_pressed(B_BUTTON, &pressed_B)) {
-    SOUND_OFF;
-    return true;
-  } else
-    return false;
-}
-
-void bomb_init_all() {
-  bomb_init(&bombs[0]);
-  bombs[1].draw_func = bomb_draw_a;
-  bombs[0].draw_func = bomb_draw_a;
-
-  bomb_init(&bombs[1]);
-  bombs[1].draw_func = bomb_draw_b;
-  bombs[1].shot_func = bomb_shot_b;
-
-  bomb_init(&bombs[2]);
-  bombs[2].draw_func = bomb_draw_c;
-  bombs[2].shot_func = bomb_shot_c;
-}
-
-void game_restart() {
-  FILL_RECT(SCRN_LEFT, 0, SCRN_RIGHT - SCRN_LEFT, SCRN_BOTTOM, BLACK);
-
-  cannon_init(&g_cannon);
-  aliens_init(&g_aliens, g_game.stage);
-  ufo_init(&g_ufo);
-  draw_bunkers();
-
-  bomb_init_all();
-}
-
-#define SCORE_1UP 150
-
-void game_main() {
-  cannon_update(&g_cannon);
-  if (g_cannon.status == OBJ_ACTIVE) {
-    uint8_t sc = laser_update(&g_cannon.laser);
-    if (sc > 0) {
-      if ((g_game.score < SCORE_1UP) && (g_game.score + sc > SCORE_1UP))
-        print_cannon_left(++g_game.left);
-      g_game.score += sc;
-      print_score();
-    }
-
-    for (uint8_t i = 0; i < BOMB_NUM; i++)
-      bomb_update(&bombs[i]);
-
-    ufo_update(&g_ufo);
-
-    aliens_update(&g_aliens);
-  }
-}
-
-#define SOUND_FX_NUM 5
 #define SND_LASER 0
 #define SND_ALIEN 1
 #define SND_UFOFLY 2
 #define SND_UFOHIT 3
 #define SND_CANNON 4
+#define SND_1UP 5
+
+#define SOUND_FX_NUM 6
 
 int16_t snd1[5] = {   // laser
   NOTE_B6, NOTE_C7, 0, NOTE_B6, -1
@@ -1092,13 +1012,17 @@ int16_t snd5[3] = {   // cannon explosion
   NOTE_B2, 0, -1
 };
 
+int16_t snd6[18] = {   // cannon explosion
+  1000, 0, 1000, 0, 1000, 0, 1000, 0, 1000, 0, 1000, 0, 1000, 0, 1000, 0, 1000, -1
+};
 
 struct sound_fx_t snd_fx[SOUND_FX_NUM] = {
   { snd1, 20, 0, false, 0, 0, SoundReady }, // data, gate_time, clk, repeat, (internal vars)
   { snd2, 20, 0, false, 0, 0, SoundReady },
   { snd3, 20, 0, true, 0, 0, SoundReady },
   { snd4, 20, 0, true, 0, 0, SoundReady },
-  { snd5, 20, 0, true, 0, 0, SoundReady }
+  { snd5, 20, 0, true, 0, 0, SoundReady },
+  { snd6, 100, 6, false, 0, 0, SoundReady }
 };
 
 int16_t bgm_s[5] = {
@@ -1178,6 +1102,89 @@ void game_sound_main() {
       sound_stop(&snd_fx[i]);
       sound_restart(&snd_fx[i]);
     }
+  }
+}
+
+void draw_game_field() {
+  DRAW_V_LINE(SCRN_LEFT - 1, 0, 64, WHITE);
+  DRAW_V_LINE(SCRN_RIGHT, 0, 64, WHITE);
+
+  print_int(SC_X + 16, SC_Y, 0, 1);
+  print_int(SC_X + 16, HSC_Y, 0, 1);
+  print_high_score();
+
+  DRAW_BITMAP(4, 22, cannon_img, CANNON_W, CANNON_H, WHITE);
+  print_cannon_left(0);
+}
+
+void game_initialize() {
+  g_game.score = 0;
+  g_game.high_score = 0;
+  g_game.stage = 0;
+  g_game.left = 3;
+}
+
+boolean game_new_game() {
+  static boolean pressed_A = false;
+  static boolean pressed_B = false;
+
+  if (button_pressed(A_BUTTON, &pressed_A)) {
+    SOUND_ON;
+    return true;
+  }
+  else if (button_pressed(B_BUTTON, &pressed_B)) {
+    SOUND_OFF;
+    return true;
+  } else
+    return false;
+}
+
+void bomb_init_all() {
+  bomb_init(&bombs[0]);
+  bombs[1].draw_func = bomb_draw_a;
+  bombs[0].draw_func = bomb_draw_a;
+
+  bomb_init(&bombs[1]);
+  bombs[1].draw_func = bomb_draw_b;
+  bombs[1].shot_func = bomb_shot_b;
+
+  bomb_init(&bombs[2]);
+  bombs[2].draw_func = bomb_draw_c;
+  bombs[2].shot_func = bomb_shot_c;
+}
+
+void game_restart() {
+  FILL_RECT(SCRN_LEFT, 0, SCRN_RIGHT - SCRN_LEFT, SCRN_BOTTOM, BLACK);
+
+  cannon_init(&g_cannon);
+  aliens_init(&g_aliens, g_game.stage);
+  ufo_init(&g_ufo);
+  draw_bunkers();
+
+  bomb_init_all();
+}
+
+#define SCORE_1UP 150
+
+void game_main() {
+  cannon_update(&g_cannon);
+  if (g_cannon.status == OBJ_ACTIVE) {
+    uint8_t sc = laser_update(&g_cannon.laser);
+    if (sc > 0) {
+      if ((g_game.score < SCORE_1UP) && (g_game.score + sc > SCORE_1UP)) {
+        print_cannon_left(++g_game.left);
+        sound_start(&snd_fx[SND_1UP]);
+      }
+      g_game.score += sc;
+      print_score();
+    }
+
+    for (uint8_t i = 0; i < BOMB_NUM; i++)
+      bomb_update(&bombs[i]);
+
+    ufo_update(&g_ufo);
+
+    aliens_update(&g_aliens);
   }
 }
 
