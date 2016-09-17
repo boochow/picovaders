@@ -104,12 +104,12 @@ void sound_set_tempo(struct sound_fx_t *s, uint8_t t) {
 
 void sound_play(struct sound_fx_t *s) {
   if (s->status == SoundPlaying) {
-    int16_t t = s->gate_time - TICKS2MSECS(s->clk - s->clk_cnt);
+    int16_t t = s->gate_time - TICKS2MSECS(s->clk_cnt++);
     if (t > 0)
       TONE(s->data[s->idx], t);
-    if (s->clk_cnt-- == 0) {
-      s->clk_cnt = s->clk;
-      if (s->data[++s->idx] < 0) {
+    if (s->clk_cnt > s->clk) {
+      s->clk_cnt = 0;
+      if (s->data[++(s->idx)] < 0) {
         if (!s->loop)
           s->status = SoundDone;
         s->idx = 0;
@@ -194,7 +194,7 @@ struct aliens_t {
 } g_aliens;
 
 void aliens_init(struct aliens_t *a, uint8_t stg) {
-  const int8_t top[9] = {0, 2, 4, 5, 5, 5, 6, 6, 6};
+  const int8_t top[9] = { 0, 2, 4, 5, 5, 5, 6, 6, 6 };
   int16_t y = ALN_TOP + top[stg % 9] * ALN_H;
   for (uint8_t i = 0; i < ALN_NUM; i++)
     a->exist[i] = true;
@@ -301,7 +301,7 @@ void aliens_move(struct aliens_t *a) {
   else {  // all aliens have moved
     if (a->bottom >= SCRN_BOTTOM)
       a->touch_down = true;
-    for (u = 0; (u < ALN_NUM) && (!a->exist[u]) ; u++);
+    for (u = 0; (u < ALN_NUM) && (!a->exist[u]); u++);
     a->nxt_update = u;
     a->pose = (a->pose + 1) % 2;
     a->cur_left = a->nxt_left;
@@ -329,7 +329,7 @@ int8_t aliens_hit_test(struct aliens_t *a, int16_t x, int16_t y) { // returns al
 
   if ((x > lmin) && (x < lmin + ALN_W_OF_ALIENS) &&
     (y > tmin) && (y < tmin + ALN_H_OF_ALIENS)) {
-    for (uint8_t i = 0; i < a->nxt_update ; i++)
+    for (uint8_t i = 0; i < a->nxt_update; i++)
       if (a->exist[i]) {
         int16_t ax = a->nxt_left + A_XOFS(A_COL(i));
         int16_t ay = a->nxt_top + A_YOFS(A_ROW(i));
@@ -337,7 +337,7 @@ int8_t aliens_hit_test(struct aliens_t *a, int16_t x, int16_t y) { // returns al
           return i;
       }
 
-    for (uint8_t i = a->nxt_update; i < ALN_NUM ; i++)
+    for (uint8_t i = a->nxt_update; i < ALN_NUM; i++)
       if (a->exist[i]) {
         int16_t ax = a->cur_left + A_XOFS(A_COL(i));
         int16_t ay = a->cur_top + A_YOFS(A_ROW(i));
@@ -447,8 +447,8 @@ void ufo_hit(struct ufo_t *u, uint8_t idx) {
 }
 
 boolean ufo_hit_test(struct ufo_t *u, uint16_t x, uint16_t y) {
-  if ((u->status == OBJ_ACTIVE) && 
-    (y < UFO_BOTTOM) && 
+  if ((u->status == OBJ_ACTIVE) &&
+    (y < UFO_BOTTOM) &&
     (x >= u->x) && (x < u->x + UFO_W)) {
 
     u->status = UFO_EXPLOSION;
@@ -520,8 +520,8 @@ struct bomb_t {
   int16_t y;
   int8_t wait_ctr;
   int8_t status;
-  void (*draw_func)(struct bomb_t *b, uint8_t color);
-  void (*shot_func)(struct bomb_t *b);
+  void(*draw_func)(struct bomb_t *b, uint8_t color);
+  void(*shot_func)(struct bomb_t *b);
 } bombs[3];
 
 void bomb_draw(struct bomb_t *b, uint8_t color) {
@@ -529,10 +529,10 @@ void bomb_draw(struct bomb_t *b, uint8_t color) {
 }
 
 void bomb_draw_a(struct bomb_t *b, uint8_t color) {
-  DRAW_PIXEL(b->x + ((1+ b->y/BOMB_V) % 2), b->y - 3, color);
-  DRAW_PIXEL(b->x + (b->y/BOMB_V % 2), b->y - 2, color);
-  DRAW_PIXEL(b->x + ((1+ b->y/BOMB_V) % 2), b->y - 1, color);
-  DRAW_PIXEL(b->x + (b->y/BOMB_V % 2), b->y, color);
+  DRAW_PIXEL(b->x + ((1 + b->y / BOMB_V) % 2), b->y - 3, color);
+  DRAW_PIXEL(b->x + (b->y / BOMB_V % 2), b->y - 2, color);
+  DRAW_PIXEL(b->x + ((1 + b->y / BOMB_V) % 2), b->y - 1, color);
+  DRAW_PIXEL(b->x + (b->y / BOMB_V % 2), b->y, color);
 }
 
 void bomb_draw_b(struct bomb_t *b, uint8_t color) {
@@ -565,7 +565,7 @@ int8_t search_alien(struct aliens_t *a, int8_t x) {
 
 void bomb_shot_from(struct bomb_t *b, uint8_t a_idx) {
   int8_t i = a_idx;
-  while ((i -= ALN_COLUMN) >= 0) 
+  while ((i -= ALN_COLUMN) >= 0)
     if (g_aliens.exist[i])
       a_idx = i;
   b->status = OBJ_ACTIVE;
@@ -596,13 +596,13 @@ void bomb_hitimg_draw(struct bomb_t *b, uint8_t color) {
   DRAW_PIXEL(b->x, b->y, color);
   DRAW_PIXEL(b->x + 1, b->y, color);
   DRAW_PIXEL(b->x, b->y - 1, color);
-  DRAW_PIXEL(b->x + 1, b->y-1, color);
+  DRAW_PIXEL(b->x + 1, b->y - 1, color);
 }
 
 boolean bomb_bunker_test(struct bomb_t *b) {
   if ((b->y < BUNKER_BOTTOM) && (b->y > BUNKER_TOP))
     if (GET_PIXEL(b->x, b->y) ||
-      GET_PIXEL(b->x + 1, b->y ) ||
+      GET_PIXEL(b->x + 1, b->y) ||
       GET_PIXEL(b->x, b->y - 1) ||
       GET_PIXEL(b->x + 1, b->y - 1)) {
       return true;
@@ -627,8 +627,8 @@ void bomb_move(struct bomb_t *b) {
 
 void bomb_shot(struct bomb_t *b) {
   static uint8_t last_shot = 0;
-  
-  if ((++b->wait_ctr > BOMB_SHOT_INTERVAL) && (++last_shot > (BOMB_SHOT_INTERVAL / BOMB_NUM))) {
+
+  if ((++b->wait_ctr > BOMB_SHOT_INTERVAL) && (++last_shot > BOMB_SHOT_INTERVAL / BOMB_NUM)) {
     b->shot_func(b);
     last_shot = 0;
   }
@@ -738,7 +738,7 @@ uint8_t laser_update(struct laser_t *l) { // returns point if laser hits
       aliens_hit(&g_aliens, hit);
       result = alien_points[A_ROW(hit)];
       l->status = OBJ_READY;
-    } 
+    }
     else if (ufo_hit_test(&g_ufo, l->x, l->y)) {
       uint8_t idx = laser_ufo_point(l);
       ufo_hit(&g_ufo, idx);
@@ -746,8 +746,8 @@ uint8_t laser_update(struct laser_t *l) { // returns point if laser hits
       l->status = OBJ_READY;
     }
     else if (laser_bunker_test(l)) {
-        l->status = LASER_EXPLOSION;
-      }
+      l->status = LASER_EXPLOSION;
+    }
     else {
       for (uint8_t i = 0; i < BOMB_NUM; i++) {
         if ((bombs[i].status == OBJ_ACTIVE) &&
@@ -952,7 +952,7 @@ void game_title_draw() {
     0x3d, 0x3d, 0, 0,
     0x18, 0x3c, 0x24, 0x24, 0x24, 0,
     0x18, 0x3c, 0x24, 0x24, 0x3c, 0x18, 0,
-    0x04, 0x1c, 0x38, 0x20, 0x38, 0x1c, 0x04, 
+    0x04, 0x1c, 0x38, 0x20, 0x38, 0x1c, 0x04,
     0x10, 0x38, 0x2a, 0x2a, 0x2e, 0x3c, 0x20,
     0x18, 0x3c, 0x24, 0x24, 0x27, 0x3f, 0x20, 0,
     0x1c, 0x3e, 0x2a, 0x2a, 0x2e, 0x0c, 0,
@@ -967,18 +967,18 @@ void game_title_alien_draw(int16_t y0, uint8_t c) {
     int16_t x = TITLE_LEFT - 4 + ALN_W * i;
     int16_t y = y0 - 20 + ALN_H * i;
     switch (i / 3) {
-    case 0: DRAW_BITMAP(x, y, aln3_img[y0/8 % 2], ALN_W, ALN_H, c); break;
-    case 1: DRAW_BITMAP(x, y, aln2_img[y0/8 % 2], ALN_W, ALN_H, c); break;
-    default: DRAW_BITMAP(x, y, aln1_img[y0/8 % 2], ALN_W, ALN_H, c);
+    case 0: DRAW_BITMAP(x, y, aln3_img[y0 / 8 % 2], ALN_W, ALN_H, c); break;
+    case 1: DRAW_BITMAP(x, y, aln2_img[y0 / 8 % 2], ALN_W, ALN_H, c); break;
+    default: DRAW_BITMAP(x, y, aln1_img[y0 / 8 % 2], ALN_W, ALN_H, c);
     }
   }
   for (uint8_t i = 8; i < 15; i++) {
     int16_t x = TITLE_LEFT - 4 + ALN_W * i;
     int16_t y = y0 - 20 + ALN_H * (14 - i);
-    switch ((14-i) / 3) {
-    case 0: DRAW_BITMAP(x, y, aln3_img[y0/8 % 2], ALN_W, ALN_H, c); break;
-    case 1: DRAW_BITMAP(x, y, aln2_img[y0/8 % 2], ALN_W, ALN_H, c); break;
-    default: DRAW_BITMAP(x, y, aln1_img[y0/8 % 2], ALN_W, ALN_H, c);
+    switch ((14 - i) / 3) {
+    case 0: DRAW_BITMAP(x, y, aln3_img[y0 / 8 % 2], ALN_W, ALN_H, c); break;
+    case 1: DRAW_BITMAP(x, y, aln2_img[y0 / 8 % 2], ALN_W, ALN_H, c); break;
+    default: DRAW_BITMAP(x, y, aln1_img[y0 / 8 % 2], ALN_W, ALN_H, c);
     }
   }
   int16_t x1 = UFO_W * 23 - y0;
@@ -1041,7 +1041,7 @@ struct sound_fx_t bgm = { bgm_s, 70, 52, true, 0, false };
 
 #define BGM_STEP_NUM 10
 
-uint8_t bgm_speed[BGM_STEP_NUM] =   { 52, 44, 36, 28, 23, 18, 13, 10, 7, 5 };
+uint8_t bgm_speed[BGM_STEP_NUM] = { 52, 44, 36, 28, 23, 18, 13, 10, 7, 5 };
 uint8_t bgm_alien_num[BGM_STEP_NUM] = { 50, 40, 30, 22, 16, 12,  8,  4, 2, 1 };
 
 void game_sound_main() {
@@ -1143,7 +1143,8 @@ boolean game_new_game() {
   else if (button_pressed(B_BUTTON, &pressed_B)) {
     SOUND_OFF;
     return true;
-  } else
+  }
+  else
     return false;
 }
 
@@ -1177,11 +1178,6 @@ void game_restart() {
 void game_main() {
   cannon_update(&g_cannon);
   if (g_cannon.status == OBJ_ACTIVE) {
-    for (uint8_t i = 0; i < BOMB_NUM; i++)
-      bomb_update(&bombs[i]);
-    ufo_update(&g_ufo);
-    aliens_update(&g_aliens);
-    
     uint8_t sc = laser_update(&g_cannon.laser);
     if (sc > 0) {
       if ((g_game.score < SCORE_1UP) && (g_game.score + sc > SCORE_1UP)) {
@@ -1191,11 +1187,16 @@ void game_main() {
       g_game.score += sc;
       print_score();
     }
+
+    for (uint8_t i = 0; i < BOMB_NUM; i++)
+      bomb_update(&bombs[i]);
+    ufo_update(&g_ufo);
+    aliens_update(&g_aliens);
   }
 }
 
 void print_game_over() {
-  FILL_RECT(33,23,60,37,BLACK);
+  FILL_RECT(33, 23, 60, 37, BLACK);
   G_TXT_CURSOR(37, 28);
   G_PRINT(F("GAME OVER"));
 }
