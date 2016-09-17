@@ -24,6 +24,7 @@ Arduboy arduboy;
 #define SCRN_LEFT  19
 #define SCRN_RIGHT 107
 #define SCRN_BOTTOM 64
+#define SCRN_FPS 60
 
 
 // 3x6 pixel digit font
@@ -57,6 +58,7 @@ void print_int(int16_t x, int16_t y, uint16_t s, uint8_t digit) {
 // Sound utilities
 
 #include "pitches.h"
+#define TICKS2MSECS(t) ((t) * (1000 / SCRN_FPS))
 
 enum SoundState {
   SoundReady,
@@ -101,13 +103,17 @@ void sound_set_tempo(struct sound_fx_t *s, uint8_t t) {
 }
 
 void sound_play(struct sound_fx_t *s) {
-  if ((s->status == SoundPlaying) && (s->clk_cnt-- == 0)) {
-    s->clk_cnt = s->clk;
-    TONE(s->data[s->idx++], s->gate_time);
-    if (s->data[s->idx] < 0) {
-      if (!s->loop)
-        s->status = SoundDone;
-      s->idx = 0;
+  if (s->status == SoundPlaying) {
+    int16_t t = s->gate_time - TICKS2MSECS(s->clk - s->clk_cnt);
+    if (t > 0)
+      TONE(s->data[s->idx], t);
+    if (s->clk_cnt-- == 0) {
+      s->clk_cnt = s->clk;
+      if (s->data[++s->idx] < 0) {
+        if (!s->loop)
+          s->status = SoundDone;
+        s->idx = 0;
+      }
     }
   }
 }
@@ -371,9 +377,9 @@ void aliens_update(struct aliens_t *a) {
 #define UFO_BOTTOM 3
 #define UFO_W 7
 #define UFO_H 3
-#define UFO_INTERVAL 1500 // 60 ticks * 25 sec
-#define UFO_WAIT 2
-#define UFO_EXPLOSION 120
+#define UFO_INTERVAL (25 * SCRN_FPS)
+#define UFO_WAIT (SCRN_FPS / 30)
+#define UFO_EXPLOSION (2 * SCRN_FPS)
 
 const uint8_t ufo_img[UFO_W] PROGMEM =
 { 0x06, 0x05, 0x07, 0x03, 0x07, 0x05, 0x06 };
@@ -504,10 +510,10 @@ void draw_bunkers() {
 /////////////////////////////////////////////////////////
 
 #define BOMB_NUM 3
-#define BOMB_WAIT 3
+#define BOMB_WAIT (SCRN_FPS / 20)
 #define BOMB_V 2
-#define BOMB_EXPLOSION 18
-#define BOMB_SHOT_INTERVAL 60
+#define BOMB_EXPLOSION (SCRN_FPS / 3)
+#define BOMB_SHOT_INTERVAL SCRN_FPS
 
 struct bomb_t {
   int16_t x;
@@ -558,8 +564,10 @@ int8_t search_alien(struct aliens_t *a, int8_t x) {
 }
 
 void bomb_shot_from(struct bomb_t *b, uint8_t a_idx) {
-  while ((a_idx >= ALN_COLUMN) && g_aliens.exist[a_idx - ALN_COLUMN])
-    a_idx -= ALN_COLUMN;
+  int8_t i = a_idx;
+  while ((i -= ALN_COLUMN) >= 0) 
+    if (g_aliens.exist[i])
+      a_idx = i;
   b->status = OBJ_ACTIVE;
   b->x = g_aliens.nxt_left + A_XOFS(A_COL(a_idx)) + ALN_W / 2 - 1;
   b->y = g_aliens.nxt_top + A_YOFS(A_ROW(a_idx)) + ALN_H + ALN_VSPACING;
@@ -620,7 +628,7 @@ void bomb_move(struct bomb_t *b) {
 void bomb_shot(struct bomb_t *b) {
   static uint8_t last_shot = 0;
   
-  if ((++b->wait_ctr > BOMB_SHOT_INTERVAL) && (++last_shot > BOMB_SHOT_INTERVAL / BOMB_NUM)) {
+  if ((++b->wait_ctr > BOMB_SHOT_INTERVAL) && (++last_shot > (BOMB_SHOT_INTERVAL / BOMB_NUM))) {
     b->shot_func(b);
     last_shot = 0;
   }
@@ -632,7 +640,7 @@ void bomb_shot(struct bomb_t *b) {
 
 #define LASER_V 2
 #define LASER_WAIT 0
-#define LASER_CNTR_INIT 14
+#define LASER_CNTR_INIT 14  // to adjust points of ufo 
 #define LASER_CNTR_MOD 15
 #define LASER_EXPLOSION ALN_EXPLOSION
 
@@ -1169,6 +1177,11 @@ void game_restart() {
 void game_main() {
   cannon_update(&g_cannon);
   if (g_cannon.status == OBJ_ACTIVE) {
+    for (uint8_t i = 0; i < BOMB_NUM; i++)
+      bomb_update(&bombs[i]);
+    ufo_update(&g_ufo);
+    aliens_update(&g_aliens);
+    
     uint8_t sc = laser_update(&g_cannon.laser);
     if (sc > 0) {
       if ((g_game.score < SCORE_1UP) && (g_game.score + sc > SCORE_1UP)) {
@@ -1178,13 +1191,6 @@ void game_main() {
       g_game.score += sc;
       print_score();
     }
-
-    for (uint8_t i = 0; i < BOMB_NUM; i++)
-      bomb_update(&bombs[i]);
-
-    ufo_update(&g_ufo);
-
-    aliens_update(&g_aliens);
   }
 }
 
@@ -1197,7 +1203,7 @@ void print_game_over() {
 void setup() {
   arduboy.begin();
   arduboy.clear();
-  arduboy.setFrameRate(60);
+  arduboy.setFrameRate(SCRN_FPS);
 
   g_game.status = GameTitle;
 }
