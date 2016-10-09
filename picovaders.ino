@@ -2,7 +2,7 @@
 
 #define MAXINT16 65535
 
-Arduboy arduboy;
+static Arduboy arduboy;
 
 #define DRAW_PIXEL(x,y,c)    arduboy.drawPixel((x), (y), (c));
 #define GET_PIXEL(x,y)      arduboy.getPixel((x), (y))
@@ -522,7 +522,7 @@ struct bomb_t {
   int8_t status;
   void(*draw_func)(struct bomb_t *b, uint8_t color);
   void(*shot_func)(struct bomb_t *b);
-} bombs[3];
+} bombs[BOMB_NUM];
 
 void bomb_draw(struct bomb_t *b, uint8_t color) {
   b->draw_func(b, color);
@@ -982,7 +982,7 @@ void game_title_alien_draw(int16_t y0, uint8_t c) {
     }
   }
   int16_t x1 = UFO_W * 23 - y0;
-  int16_t x2 = y0 - UFO_W * 5;
+  int16_t x2 = y0 - UFO_W * 6;
   DRAW_BITMAP(x1, TITLE_TOP, ufo_img, UFO_W, UFO_H, c);
   DRAW_BITMAP(x2, TITLE_TOP + UFO_H, ufo_img, UFO_W, UFO_H, c);
 }
